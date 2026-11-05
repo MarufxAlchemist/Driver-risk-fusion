@@ -1,0 +1,58 @@
+[project]
+name = "driverisk"
+version = "0.0.1"
+description = "Personalized driver behavior monitoring and early risk prediction with cross-attention multi-sensor fusion"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "pyarrow>=16",
+    "pyyaml>=6.0",
+    "torch>=2.4",
+    "fastapi>=0.115",
+    "pydantic>=2.8",
+    "uvicorn>=0.30",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.2",
+    "httpx>=0.27",
+    "ruff>=0.6",
+    "pre-commit>=3.8",
+]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/driverisk"]
+
+# CPU wheels keep CI and laptops light; GPU training runs on Colab/Kaggle (ADR-0006).
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "scripts"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "T20", "NPY"]
+
+[tool.ruff.lint.per-file-ignores]
+# Scripts are command-line entry points and may print.
+"scripts/*" = ["T20"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = ["slow: long or GPU tests, not run in CI by default"]
