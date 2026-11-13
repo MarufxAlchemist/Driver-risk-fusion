@@ -148,13 +148,13 @@ A10 and A11 were approved and `05` was edited to match; `contract_version` stays
 6. **Agree the event thresholds** in `configs/events.yaml` with the guide (they are my proposals, see below).
 
 ## Next (P1, remaining)
-Not started: dataset augmentation (P1-C3), MediaPipe vision features and causal PERCLOS (P1-A1/A2; needs `mediapipe` added to the lock file, ADR-0006, and your webcam), then the loaders UAH (P1-B1), DMD (P1-A3), splits script (P1-C2) and label maps (P1-C1), which wait for the downloads (H1). The own-data pipeline (P1-D1) waits for the phone-app test (H4).
+Not started: MediaPipe vision features and causal PERCLOS (P1-A1/A2; needs `mediapipe` added to the lock file, ADR-0006, and your webcam), then the loaders UAH (P1-B1), DMD (P1-A3), splits script (P1-C2) and label maps (P1-C1), which wait for the downloads (H1). The own-data pipeline (P1-D1) waits for the phone-app test (H4).
 
 ---
 
 ## P1 work log (2026-11-13, autonomous hour after "go")
 
-Branches `fix/d-make-ps1-uv-path`, `feat/c-metrics`, `feat/d-experiment-log`, `feat/b-motion-features`, `feat/b-events`, all merged into `dev` with `--no-ff`. Tests: **175 passed** (102 before this hour), lint clean. Every module was written test-first; the expected numbers in the metric tests are worked out by hand in comments.
+Branches `fix/d-make-ps1-uv-path`, `feat/c-metrics`, `feat/d-experiment-log`, `feat/b-motion-features`, `feat/b-events`, `feat/c-augment`, all merged into `dev` with `--no-ff`. Tests: **186 passed** (102 before this hour), lint clean. Every module was written test-first; the expected numbers in the metric tests are worked out by hand in comments.
 
 | Task | State | What it is |
 |---|---|---|
@@ -164,7 +164,7 @@ Branches `fix/d-make-ps1-uv-path`, `feat/c-metrics`, `feat/d-experiment-log`, `f
 | P1-D4 experiment logging | done | `utils/experiment.py` + `experiments/README.md`: run folder, config/meta/metrics, `results.csv` |
 | P1-B2 motion features | done on **synthetic data only** | `features/motion.py`: all 14 features from raw phone IMU + GPS, causal. On a synthetic drive with a rotated phone it recovers `acc_long`/`acc_lat` with RMSE 0.024 m/s^2 and correlation above 0.999 |
 | P1-B3 event detector | done on synthetic frames only | `features/events.py` + `configs/events.yaml`: harsh_accel, harsh_brake, sharp_turn, lane_weave |
-| P1-C3 normalization | already done in P0 (`NormStats`); **augmentation not started** | |
+| P1-C3 normalization + augmentation | normalization was done in P0; augmentation done | `data/augment.py`: motion jitter, scale and axis rotation (in physical units), vision jitter, random face-not-found steps; `WindowDataset(..., transform=Augmenter(...))`, off by default. Magnitudes in `AugmentConfig` are proposals; tune on validation only |
 
 ### New assumptions (please confirm or overrule)
 
