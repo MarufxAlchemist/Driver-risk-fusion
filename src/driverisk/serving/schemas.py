@@ -14,10 +14,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from driverisk.data import schema as S
 
 Modality = Literal["camera", "motion"]
+# ADR-0007 part 2: event alerts use the event names of the data contract, state alerts use the
+# window-class names. A test pins this Literal to schema.EVENT_TYPES + schema.CLASSES[1:].
 AlertType = Literal[
-    "aggressive_accel", "harsh_brake", "sharp_turn", "lane_weave", "drowsy", "micro_sleep",
-    "distracted",
+    "harsh_accel", "harsh_brake", "sharp_turn", "lane_weave", "micro_sleep", "distraction_episode",
+    "aggressive", "drowsy", "distracted",
 ]  # fmt: skip
+EVENT_ALERT_TYPES: tuple[str, ...] = S.EVENT_TYPES
+STATE_ALERT_TYPES: tuple[str, ...] = S.CLASSES[1:]
 AlertKind = Literal["predictive", "detected"]
 Severity = Literal["info", "medium", "high"]
 CalibrationStatus = Literal["calibrating", "ready", "stale"]
@@ -174,6 +178,8 @@ class Alert(_Model):
     def _horizon_matches_kind(self) -> Alert:
         if self.kind == "predictive" and self.horizon_s not in (2, 3, 5):
             raise ValueError("predictive alerts need horizon_s in {2, 3, 5}")
+        if self.kind == "predictive" and self.type not in EVENT_ALERT_TYPES:
+            raise ValueError("predictive alerts are only allowed for event types (forecast onsets)")
         if self.kind == "detected" and self.horizon_s != 0:
             raise ValueError("detected alerts need horizon_s == 0")
         return self

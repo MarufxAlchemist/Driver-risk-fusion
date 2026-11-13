@@ -173,6 +173,33 @@ def test_alert_field_rules() -> None:
     assert ok.kind == "detected"
 
 
+def test_alert_types_follow_event_state_taxonomy() -> None:
+    """ADR-0007 part 2: event alerts use event names, state alerts use class names."""
+    from typing import get_args
+
+    assert get_args(M.AlertType) == (*S.EVENT_TYPES, *S.CLASSES[1:])
+    assert M.EVENT_ALERT_TYPES == S.EVENT_TYPES
+    assert M.STATE_ALERT_TYPES == S.CLASSES[1:]
+
+
+def test_predictive_alerts_only_for_event_types() -> None:
+    base = example_alert("trp_1", "drv_1").model_dump()
+    assert base["kind"] == "predictive" and base["type"] in S.EVENT_TYPES
+    for state in S.CLASSES[1:]:
+        with pytest.raises(ValueError, match="predictive"):
+            M.Alert.model_validate({**base, "type": state})
+        # the same state alert is fine once it is a detected one
+        ok = M.Alert.model_validate({**base, "type": state, "kind": "detected", "horizon_s": 0})
+        assert ok.type == state
+
+
+def test_old_alert_names_are_gone() -> None:
+    base = example_alert("trp_1", "drv_1").model_dump()
+    with pytest.raises(ValueError):
+        M.Alert.model_validate({**base, "type": "aggressive_accel"})
+    assert M.Alert.model_validate({**base, "type": "harsh_accel"}).type == "harsh_accel"
+
+
 def test_contract_example_numbers() -> None:
     ev = example_alert("trp_1", "drv_1").reason.evidence
     for e in ev:
