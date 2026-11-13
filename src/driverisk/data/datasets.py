@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -121,6 +121,7 @@ class WindowDataset(Dataset):
         window_steps: int = S.WINDOW_STEPS,
         stride_steps: int = S.STRIDE_STEPS,
         horizons: Sequence[int] = S.HORIZONS_S,
+        transform: Callable[[dict], dict] | None = None,
     ) -> None:
         if split is not None and split not in S.SPLITS:
             raise ValueError(f"split must be one of {S.SPLITS} or None, got {split!r}")
@@ -130,6 +131,7 @@ class WindowDataset(Dataset):
         self.split = split
         self.window_steps, self.stride_steps = window_steps, stride_steps
         self.horizons = tuple(horizons)
+        self.transform = transform  # for example data.augment.Augmenter; training split only
         self.trips = [_load_trip(r) for _, r in rows.iterrows()]
         self.norm = norm_stats or NormStats.identity()
         self.index = [
@@ -163,7 +165,7 @@ class WindowDataset(Dataset):
         nan_v, nan_m = np.isnan(x_v), np.isnan(x_m)
         x_v = np.where(nan_v, 0.0, (x_v - self.norm.mean_v) / self.norm.std_v).astype(np.float32)
         x_m = np.where(nan_m, 0.0, (x_m - self.norm.mean_m) / self.norm.std_m).astype(np.float32)
-        return {
+        sample = {
             "x_v": torch.from_numpy(x_v),
             "x_m": torch.from_numpy(x_m),
             "nan_v": torch.from_numpy(nan_v),
@@ -176,3 +178,4 @@ class WindowDataset(Dataset):
             "trip_id": trip.trip_id,
             "t_start": float(trip.t[s]),
         }
+        return self.transform(sample) if self.transform is not None else sample
