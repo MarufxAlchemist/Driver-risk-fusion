@@ -13,7 +13,7 @@ Vision runs at 15-30 fps, IMU at about 10 Hz (UAH) to 50-100 Hz (own phone), GPS
 3. **Embedding-level interface only:** each branch outputs learned embeddings. Compact; couples training of branches to the fusion network.
 
 ## Decision
-Use option 2 as the primary contract: 10 Hz common clock, `X_v [T,16]`, `X_m [T,14]`, masks, windows of 50 steps with stride 10. Keep an **optional clip tensor** for the 3D-CNN path (path + frame index, not stored pixels), whose embedding can be appended to `X_v`.
+Use option 2 as the primary contract: 10 Hz common clock, `X_v [T,16]`, `X_m [T,14]`, masks, windows of 50 steps with stride 10. Keep an **optional clip tensor** for the 3D-CNN path (path + frame index, not stored pixels). Its embeddings travel as a separate tensor `e_clip [B, 5, Dc]` (one per second); the model repeats each over its 10 steps. They are **not** appended to `X_v`, which stays at 16 features (amended 2026-11-13, fix F7; the earlier text said "appended to `X_v`", which would have silently changed `Dv`).
 
 ## Consequences
 - Easy stubs and unit tests; A, B, C, D can work from week 2.

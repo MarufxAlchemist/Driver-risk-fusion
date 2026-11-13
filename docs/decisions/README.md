@@ -19,7 +19,7 @@ A short note for every decision that is expensive to reverse or that someone wil
 | 0004 | 3D-CNN as a candidate backbone, validated by ablation | Proposed |
 | 0005 | Driver-disjoint splits and within-driver personalization evaluation | Proposed |
 | 0006 | Technology stack and edge export path | Proposed |
-| 0007 | Driver keys and the class / event / alert taxonomy | Proposed |
+| 0007 | Driver keys and the class / event / alert taxonomy | Accepted |
 
 ## Template
 

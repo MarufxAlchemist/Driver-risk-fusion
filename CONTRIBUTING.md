@@ -2,6 +2,21 @@
 
 Rules for four people working in parallel. Short on purpose; if something is unclear, ask in the team chat and then fix this file.
 
+## 0. Solo mode (in force since 2026-11-13)
+
+One person (Maruf) is building all four workstreams, with Claude as the coding assistant. Sections 1-11 below are written for a team; where they conflict with this section, this section wins until more people join.
+
+- **No cross-workstream reviewer.** Instead of rule 4.4 (approval from a different workstream) and 8 (approval from all four members), every branch passes this self-review before it merges:
+  1. `make lint` and `make test` pass locally (the same commands CI runs; on Windows use `mingw32-make` or `.\make.ps1`).
+  2. A new behaviour has a test, and a bug fix has a test that failed before the fix.
+  3. The diff has been read once in full (`git diff dev...HEAD`), looking for leftover debug code, absolute paths, data or secrets.
+  4. Any change to `docs/03_data_contract.md`, `docs/05_api_contract.md` or an ADR was approved by Maruf **before** it was written, is described in the commit message, and updates `schema.py` / `schemas.py` and the OpenAPI snapshot in the same branch.
+  5. `docs/PROGRESS.md` says what changed, what was verified and what was not.
+- **Merging.** Work happens on `feat/<ws>-<name>`, `docs/<name>` or `fix/<name>` branches with small commits, and merges into `dev` with `git merge --no-ff` (so each branch stays visible in the history). No squash. CI runs on `dev` after every push.
+- **Gates.** `main` changes only at a phase gate, after Maruf has read the gate report in `docs/PROGRESS.md`. Nothing is merged into `main` or force-pushed without Maruf saying so. History is never rewritten without Maruf's explicit instruction.
+- **AI assistance.** Commits made with Claude's help carry a `Co-Authored-By` trailer. Whether and how this is disclosed in the report is decided with the guide (risk R22).
+- **Public repository.** The GitHub repo is public. Nothing personal goes in: no recordings, consent forms, name-to-ID tables, secrets or licensed PDFs.
+
 ## 1. Setup
 
 ```bash

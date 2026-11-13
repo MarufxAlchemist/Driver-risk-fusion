@@ -213,7 +213,7 @@ class DegradedMessage(_Model):
 
 
 class RecoveredMessage(_Model):
-    """Not in the 0.1 contract text; needed by the scripted sequence in 05 section 5."""
+    """Closes a `degraded` message for the same modality (docs/05 section 3.6)."""
 
     type: Literal["recovered"] = "recovered"
     modality: Modality

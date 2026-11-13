@@ -2,7 +2,7 @@
 
 Everything is in memory and nothing comes from a model: it exists so the dashboard can be
 built before real models exist. Auth: header `X-API-Key` on REST; WebSocket clients cannot set
-headers in browsers, so `/stream` takes `?token=` instead (assumption A10, pending approval).
+headers in browsers, so `/stream` takes `?token=` instead (docs/05 section 1, approved).
 """
 
 from __future__ import annotations

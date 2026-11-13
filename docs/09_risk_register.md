@@ -30,6 +30,8 @@ Status: DRAFT v0.1, last reviewed 2026-10-18.
 | R18 | Reference quality and numbering mistakes in presentations and reports | M | L | Citations that do not match the list | Canonical R1-R11 numbering in `01_literature_notes.md`; fix deck numbering; check references before each submission | Correct and re-submit | Rotating |
 | R19 | Reproducibility failures (cannot regenerate a number) | M | M | A run without config or commit hash | Experiment protocol rules, `make reproduce`, one config per run | Re-run and replace the number | C |
 | R20 | Guide expectations differ from the plan | L | M | Feedback at fortnightly meetings | Share this plan in week 1; adjust priorities; record approvals | Re-scope with a new ADR | Rotating |
+| R21 | **Copyright of the paper PDFs in a public repository.** At least five are IEEE copies stamped "Authorized licensed use limited to ... Restrictions apply" (R2, R4, R5, R8, R11). Eight PDFs were tracked and remain in old public history on `main` | M | M | A takedown notice, or the guide or publisher objects | PDFs are untracked and git-ignored; `docs/Research-papers/README.md` lists DOIs instead. Decision 2026-11-13: leave history as it is for now and revisit before final submission | Rewrite public history with a filter tool (never an unannounced force-push), after a backup branch and Maruf's explicit say-so | Maruf |
+| R22 | **Academic integrity: AI-assisted development of a project that is registered as a four-member B.Tech project and is now built by one student** | M | H | The guide or examiners ask who wrote what, or about team structure | Raise it at the first guide meeting (`docs/human_tasks/03_guide_meeting.md`) and agree what is acceptable and how to disclose it (a statement in the report, commit co-author trailers already record AI help); keep `docs/PROGRESS.md` and the ADRs as an honest record of who decided what | Follow the guide's ruling; if AI-written parts are not accepted, rewrite those parts by hand with the ADRs as the design record | Maruf |
 
 ---
 
@@ -48,3 +50,4 @@ Status: DRAFT v0.1, last reviewed 2026-10-18.
 | Date | Reviewed by | Changes |
 |---|---|---|
 | 2026-10-18 | Maruf | Initial register |
+| 2026-11-13 | Maruf (Claude drafted) | Added R21 (PDF copyright) and R22 (academic integrity) from `11_implementation_analysis.md` section 6. R15 and R7 now apply to a solo build: see the analysis |

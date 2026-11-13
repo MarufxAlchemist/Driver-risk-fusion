@@ -54,16 +54,18 @@ Each module lists input, output, owner and the file where it lives.
 
 | # | Module | Input | Output | Owner | Path |
 |---|---|---|---|---|---|
-| M1 | Data loaders | Raw dataset files | Per-trip parquet (`03_data_contract.md`) | A (DMD), B (UAH), D (own) | `data/` |
-| M2 | Sync + windowing | Per-trip parquet | Windows `[T, D]` + masks | B | `data/` |
-| M3 | Vision features | Video frames | `X_v [T, Dv]`, `m_v [T]` | A | `features/vision.py` |
-| M4 | Motion features | IMU + GPS | `X_m [T, Dm]`, `m_m [T]` | B | `features/motion.py` |
-| M5 | Video backbone (optional path) | Clip `[3, 16, 112, 112]` | Embedding `[Dc]` per step | A | `models/video_backbone.py` |
-| M6 | Stage 1 LSTM-AE | `X_m`, `X_v` (concat) windows of normal driving | Reconstruction error `e` | B | `models/lstm_autoencoder.py` |
-| M7 | Cross-attention fusion | `X_v`, `X_m`, `m_v`, `m_m` | Fused embedding `z [Dz]` | C | `models/fusion.py` |
-| M8 | Classifier head | `z` | Class logits `[K]` | C | `models/fusion.py` |
-| M9 | Personal baseline | `e` or `z`, `driver_id`, history | Personalized score `s_d` | C | `personalization/` |
-| M10 | Risk forecaster | Sequence of `z`, `s_d`, context | `p_risk(t, H)` for each horizon | C | `models/forecaster.py` |
+| M1 | Data loaders | Raw dataset files | Per-trip parquet (`03_data_contract.md`) | A (DMD), B (UAH), D (own) | `src/driverisk/data/` |
+| M2 | Sync + windowing | Per-trip parquet | Windows `[T, D]` + masks | B | `src/driverisk/data/` |
+| M3 | Vision features | Video frames | `X_v [T, Dv]`, `mask_v [T]` | A | `src/driverisk/features/vision.py` |
+| M4 | Motion features | IMU + GPS | `X_m [T, Dm]`, `mask_m [T]` | B | `src/driverisk/features/motion.py` |
+| M5 | Video backbone (optional path) | Clip `[3, 16, 112, 112]` | Embedding `[Dc]` per second (`e_clip [5, Dc]` per window) | A | `src/driverisk/models/video_backbone.py` |
+| M6 | Stage 1 LSTM-AE | `X_m`, `X_v` (concat) windows of normal driving | Reconstruction error `e` | B | `src/driverisk/models/lstm_autoencoder.py` |
+| M7 | Cross-attention fusion | `X_v`, `X_m`, `mask_v`, `mask_m` (+ `e_clip` if enabled) | Fused embedding `z [Dz]` | C | `src/driverisk/models/fusion.py` |
+| M8 | Classifier head | `z` | Class logits `[K]` | C | `src/driverisk/models/fusion.py` |
+| M9 | Personal baseline | `e` or `z`, `driver_id`, history | Personalized score `s_d` | C | `src/driverisk/personalization/` |
+| M10 | Risk forecaster | Sequence of `z`, `s_d`, context | `p_risk(t, H)` for each horizon | C | `src/driverisk/models/forecaster.py` |
+
+Symbols: `mask_v` and `mask_m` are the availability masks everywhere in the docs and code. (An earlier draft wrote `m_v`, `m_m`, which collides with the parquet prefix `m_` for motion features.)
 | M11 | Explanation | Features, `s_d`, attention, baseline | Reason object | C | `explain/` |
 | M12 | Inference engine | Live streams | Alerts at <= 1 Hz | D (+C) | `inference/` |
 | M13 | API + dashboard | Alert JSON, feature summaries | Web UI | D | `serving/`, `dashboard/` |
@@ -74,13 +76,13 @@ Each module lists input, output, owner and the file where it lives.
 
 ### 4.1 Vision path (two options, compared in ablation)
 
-| Option | Description | Output per 1 s step |
+| Option | Description | Output |
 |---|---|---|
-| V-feat (default) | MediaPipe face landmarks -> EAR, MAR, PERCLOS (rolling), head yaw/pitch/roll, gaze proxies, face-visible flag | `Dv` features |
-| V-3D | 3D-CNN on 16-frame 112x112 clips, pretrained init if available, fine-tuned | `Dc`-dim embedding |
-| V-2D+LSTM | 2D CNN per frame then LSTM over time (baseline for V-3D) | `Dc`-dim embedding |
+| V-feat (default) | MediaPipe face landmarks -> EAR, MAR, PERCLOS (rolling), head yaw/pitch/roll, gaze proxies, face-visible flag | `Dv = 16` features per 0.1 s step |
+| V-3D | 3D-CNN on 16-frame 112x112 clips, pretrained init if available, fine-tuned | one `Dc`-dim embedding per 1 s clip |
+| V-2D+LSTM | 2D CNN per frame then LSTM over time (baseline for V-3D) | one `Dc`-dim embedding per 1 s clip |
 
-The fusion network consumes a vision sequence regardless of option. For V-3D and V-2D+LSTM the embedding is concatenated with or replaces V-feat. ADR-0004 explains why 3D-CNN is a candidate rather than a commitment.
+The fusion network consumes a vision sequence regardless of option. For V-3D and V-2D+LSTM the clip embeddings are a separate tensor `e_clip [B, 5, Dc]` (one per second of a 50-step window); the model repeats each one over its 10 steps and uses it beside or instead of the V-feat branch. `X_v` always keeps its 16 features (`03_data_contract.md` section 4.1). ADR-0004 explains why 3D-CNN is a candidate rather than a commitment.
 
 ### 4.2 Motion path
 
@@ -88,7 +90,7 @@ IMU resampled to the common clock, gravity-aligned, filtered. GPS speed and head
 
 ### 4.3 Cross-attention fusion (M7)
 
-Inputs: `X_v [B,T,Dv]`, `X_m [B,T,Dm]`, masks `m_v`, `m_m` (True = available).
+Inputs: `X_v [B,T,Dv]`, `X_m [B,T,Dm]`, masks `mask_v`, `mask_m` (True = available).
 
 1. Project each stream to `d_model` with a linear layer + positional encoding.
 2. Learned **missing tokens** replace masked timesteps of a stream.
@@ -163,8 +165,8 @@ If the 3D-CNN path misses the budget on target hardware, V-feat remains the depl
 
 | Condition | Detection | System behaviour |
 |---|---|---|
-| Face not visible / low confidence | `face_visible = 0` or landmark confidence < threshold | `m_v = False`, fusion falls back to motion, alert metadata says `modalities_used = ["motion"]` |
-| IMU dropout or phone moved | Sample gaps, orientation jump | `m_m = False`, vision-only mode, motion calibration re-run |
+| Face not visible / low confidence | `face_visible = 0` or `face_conf < 0.5` | `mask_v = False`, fusion falls back to motion, alert metadata says `modalities_used = ["motion"]` |
+| IMU dropout or phone moved | Sample gaps, orientation jump | `mask_m = False`, vision-only mode, motion calibration re-run |
 | GPS lost | No fix | Speed from IMU integration is unreliable; speed-dependent context features set to missing, context-aware scoring disabled |
 | Low light | Face detector confidence drops | Same as face not visible; optionally IR camera later |
 | Cold-start driver | Fewer than `n_min` calibration windows | Use global thresholds, show "calibrating" in UI |
