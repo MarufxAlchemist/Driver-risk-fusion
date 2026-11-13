@@ -17,5 +17,5 @@ def test_demo_stub_runs_end_to_end(tmp_path: Path) -> None:
     result = module.run_demo(tmp_path)
     assert result["final_loss"] < result["initial_loss"]
     assert result["n_train_windows"] > 0 and result["n_test_windows"] > 0
-    assert result["alert_type"] in {"harsh_brake", "drowsy", "distracted"}
+    assert result["alert_type"] in {"aggressive", "drowsy", "distracted"}
     assert 0.0 <= result["alert_risk"] <= 1.0

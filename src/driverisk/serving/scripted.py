@@ -21,7 +21,7 @@ def example_alert(trip_id: str, driver_id: str, alert_id: str = "alt_9c01") -> M
         driver_id=driver_id,
         ts=datetime(2026, 11, 2, 9, 31, 12, 340000, tzinfo=UTC),
         t=745.3,
-        type="drowsy",
+        type="micro_sleep",  # predictive alerts name an event onset (ADR-0007), not the state
         kind="predictive",
         severity="high",
         risk_score=0.82,
@@ -49,7 +49,7 @@ def example_alert(trip_id: str, driver_id: str, alert_id: str = "alt_9c01") -> M
 
 
 def scripted_messages(trip_id: str, driver_id: str) -> list[M.WsMessage]:
-    """calibrating -> ready -> predictive drowsy alert -> degraded camera -> recovered -> end."""
+    """calibrating, ready, predictive micro_sleep alert, degraded camera, recovered, end."""
     both: list[M.Modality] = ["camera", "motion"]
     return [
         M.StatusMessage(t=0.0, risk_score=0.05, modalities_used=both, calibration="calibrating"),

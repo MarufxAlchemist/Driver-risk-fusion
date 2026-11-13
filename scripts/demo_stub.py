@@ -30,9 +30,8 @@ from driverisk.utils.seed import make_generator, set_seed
 log = logging.getLogger("demo_stub")
 API_KEY = "demo-key"
 
-# Demo-only mapping from window class to alert type. The real taxonomy is an open question
-# (docs/PROGRESS.md, assumption A9); this just exercises the alert schema.
-CLASS_TO_ALERT: dict[int, M.AlertType] = {1: "harsh_brake", 2: "drowsy", 3: "distracted"}
+# ADR-0007 part 2: a class decision is a state alert and uses the class name.
+CLASS_TO_ALERT: dict[int, M.AlertType] = {1: "aggressive", 2: "drowsy", 3: "distracted"}
 
 
 def _alert_from_window(prob: np.ndarray, gates: np.ndarray, t: float, trip_id: str, driver: str):

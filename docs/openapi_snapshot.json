@@ -91,12 +91,14 @@
           },
           "type": {
             "enum": [
-              "aggressive_accel",
+              "harsh_accel",
               "harsh_brake",
               "sharp_turn",
               "lane_weave",
-              "drowsy",
               "micro_sleep",
+              "distraction_episode",
+              "aggressive",
+              "drowsy",
               "distracted"
             ],
             "title": "Type",
@@ -541,12 +543,14 @@
           "types": {
             "items": {
               "enum": [
-                "aggressive_accel",
+                "harsh_accel",
                 "harsh_brake",
                 "sharp_turn",
                 "lane_weave",
-                "drowsy",
                 "micro_sleep",
+                "distraction_episode",
+                "aggressive",
+                "drowsy",
                 "distracted"
               ],
               "type": "string"
@@ -826,12 +830,14 @@
             },
             "propertyNames": {
               "enum": [
-                "aggressive_accel",
+                "harsh_accel",
                 "harsh_brake",
                 "sharp_turn",
                 "lane_weave",
-                "drowsy",
                 "micro_sleep",
+                "distraction_episode",
+                "aggressive",
+                "drowsy",
                 "distracted"
               ]
             },
