@@ -25,16 +25,16 @@ Gate text: "make demo-stub runs stub data -> stub features -> toy fusion -> mock
 
 **Not verified, and why:**
 - **The dashboard page was never opened in a browser** (no browser available to me). It is served and its WebSocket target works (checked with a socket client), but rendering and the gauge/alert display are untested. Please open `make serve` -> http://127.0.0.1:8000/dashboard/ and press "Start demo trip".
-- **CI has never run** (nothing is pushed). The workflow exists but is untested on GitHub; Mac was not tested at all.
+- **Mac was not tested.** CI (lint, tests, stub demo) passed on GitHub for `dev` at the `v0.0` commit on ubuntu-latest and windows-latest (run 43440961188).
 - **The Colab notebook has not been run** on Colab/Kaggle.
-- `make setup` itself (which also installs pre-commit hooks) was not run; the clean clone used `uv sync --locked` directly. Only Windows was tested, not Mac.
+- `make setup` itself (which also installs pre-commit hooks) was not run; the clean clone used `uv sync --locked` directly. Local runs were Windows only; CI added Linux.
 
 ### P0 tasks
 
 | Task | State | Notes |
 |---|---|---|
 | P0-D2 scaffold | done | `feat/d-scaffold`; uv + Python 3.11.18, `uv.lock`, Makefile + `make.ps1`, pre-commit config, `.gitattributes`, `data/README.md` |
-| P0-D3 CI | written, **not run** | `.github/workflows/ci.yml`, ubuntu + windows |
+| P0-D3 CI | done | `.github/workflows/ci.yml`; green on ubuntu + windows after the first push of `dev` |
 | P0-D4 docs into `docs/` | done | `docs/d-relayout`; ADRs in `docs/decisions/`; PDFs untracked |
 | P0-C3 validator + WindowDataset | done | `schema.py`, `validate.py`, `splits.py`, `normalize.py`, `datasets.py` |
 | P0-A2 / P0-B2 stubs | done | `tests/fixtures/make_stub_vision.py`, `make_stub_motion.py`; generator in `driverisk/data/stubs.py` |
@@ -46,13 +46,13 @@ Gate text: "make demo-stub runs stub data -> stub features -> toy fusion -> mock
 | P0-C1 decisions D1-D8 | partly | defaults taken, recorded below; ADR-0006/0007 written as **Proposed** |
 | P0-C2 freeze contract v1.0 | **not done** | blocked on dataset verification; `contract_version` stays `"0.1"` |
 | P0-A1 DMD / P0-B1 UAH verification | **blocked (human)** | needs downloads (H1); the inspector is ready |
-| P0-D1 GitHub repo settings | **human** | branch protection, labels, project board; nothing pushed |
+| P0-D1 GitHub repo settings | **human** | branch protection, labels, project board (GitHub settings, not doable from here) |
 | P0-D5 phone app test | **blocked (human)** | needs a phone (H4); checker is ready |
 | P0-D6 guide meeting | **human** | one-pager ready (`03_guide_meeting.md`) |
 | P0-ALL R8/R9 notes | partly | R8 read in full (notes in `11_implementation_analysis.md`); R9 PDF missing |
 
 ### Branches
-Work was done on `docs/d-relayout`, `feat/d-scaffold`, `feat/c-utils`, `feat/c-contract`, `feat/c-window-dataset`, `feat/c-toy-fusion`, `feat/d-mock-api`, `feat/c-demo-stub`, `docs/c-p0-docs`, merged with `--no-ff` into `dev`. `main` is unchanged and nothing is pushed. Commits carry a Claude co-author trailer (the earlier ones name Opus 5.5, the later ones Sonnet 5.5, because the model was switched mid-session).
+Work was done on `docs/d-relayout`, `feat/d-scaffold`, `feat/c-utils`, `feat/c-contract`, `feat/c-window-dataset`, `feat/c-toy-fusion`, `feat/d-mock-api`, `feat/c-demo-stub`, `docs/c-p0-docs`, merged with `--no-ff` into `dev`. `dev` and tag `v0.0` are pushed to GitHub (the repo is public); `main` is unchanged on both sides. Commits carry a Claude co-author trailer (the earlier ones name Opus 5.5, the later ones Sonnet 5.5, because the model was switched mid-session).
 
 ---
 
@@ -90,7 +90,7 @@ A10 and A11 touch the API contract, so by the master prompt they need your expli
 | F6 `mask_v`/`mask_m` naming | code follows it; docs `02`/`03` not yet edited |
 | F9, F10, F11 | implemented as assumptions A3-A7; docs not yet edited |
 | F19 | partly (A10-A12); remaining request/response details in `05` not yet written into the doc |
-| F22 Windows shim + Windows CI | done (CI unrun) |
+| F22 Windows shim + Windows CI | done (CI green) |
 | F25 UAH unit/axis rules | not implemented (needs P1-B1 and a real file); `inspect_uah.py` will show units |
 | F7, F8, F12, F13-F18, F20, F21, F23, F24, F26, F27 | **not started**; they belong to the doc edits and phases named in the analysis. None blocks P1 except F12 (taxonomy) and F25 |
 
@@ -113,7 +113,7 @@ A10 and A11 touch the API contract, so by the master prompt they need your expli
 
 1. **Approve or change** A10, A11 (they alter `05`) and ADR-0007 part 2 (alert names).
 2. **Open the dashboard** once and tell me whether it looks right.
-3. **Push `dev`** to GitHub when you are happy, so CI runs; tell me if the repo is public (then decide on rewriting history for the PDFs).
+3. **The repo is public** (you confirmed): `dev` is pushed and CI is green. The paper PDFs are still in old public history on `main`; decide whether to rewrite it (I will not force-push without your say).
 4. **Start the long-lead human tasks** (`docs/human_tasks/README.md`): DMD registration and UAH download (H1), missing papers (H10), guide meeting (H5), phone and passenger for the app test (H4, H6).
 5. Say **go for P1**. Until the datasets exist, P1 can start with motion features (P1-B2), the metrics library (P2-C1, moved up), event detector, and vision features on your webcam.
 
