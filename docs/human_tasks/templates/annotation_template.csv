@@ -1,0 +1,3 @@
+trip_id,type,onset_s,offset_s,uncertain
+own_d01_20261201_01,micro_sleep,312.4,314.1,false
+own_d01_20261201_01,distraction_episode,500.0,503.5,true

@@ -10,7 +10,7 @@ Project Guide: Mrs. Urmila V. Patil
 | Maruf Nadaf | 4031 | C. Fusion, personalization, forecasting |
 | Gautam Iyengar | 4020 | D. Platform and delivery |
 
-> Status: **Phase 0 (Foundations)**. Documentation first, code second. See `docs/00_PROJECT_PLAN.md`.
+> Status: **Phase 0 (Foundations)** complete, awaiting review. See `docs/PROGRESS.md` and `docs/00_PROJECT_PLAN.md`.
 
 ---
 
@@ -70,14 +70,19 @@ scripts/   src/driverisk/   tests/
 | `docs/reports/README.md` | Outlines for synopsis, mid-term and final report |
 | `CONTRIBUTING.md` | Git workflow, code style, PR rules |
 
-## Quickstart (will work after Phase 0 scaffold)
+## Quickstart
+
+Needs [uv](https://docs.astral.sh/uv/) (it installs Python 3.11 and the exact environment from `uv.lock`).
 
 ```bash
-git clone <repo-url> && cd driver-risk-fusion
+git clone https://github.com/MarufxAlchemist/Driver-risk-fusion.git && cd Driver-risk-fusion
 make setup          # create env, install deps, pre-commit hooks
-make test           # run unit tests on stub fixtures
-make demo-stub      # run the stub pipeline end to end
+make test           # unit, contract and integration tests on stub data
+make demo-stub      # stub data -> validator -> toy fusion -> mock API
+make serve          # mock API at http://127.0.0.1:8000 (dashboard at /dashboard/)
 ```
+
+On Windows without `make`, use `.\make.ps1 <target>` (same targets).
 
 ## Datasets
 
@@ -85,4 +90,4 @@ UAH-DriveSet, DMD (Driver Monitoring Dataset) and our own recordings. Data is ne
 
 ## License
 
-To be decided by the team (see ADR-0001). Dataset licenses are separate and must be respected.
+MIT for our code (see `LICENSE`; to be confirmed with the guide, ADR-0001). Dataset licenses are separate and must be respected.
