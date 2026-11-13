@@ -1,0 +1,34 @@
+# Thresholds of the motion event detector (src/driverisk/features/events.py, docs/03 section 5.2).
+#
+# STATUS: PROPOSED VALUES. They are round numbers of the size usually quoted for phone-based
+# harsh-driving detection, NOT taken from a specific paper and NOT yet agreed with the guide.
+# The contract says they are fixed with the guide, then frozen BEFORE any model evaluation.
+# Change them only before that point; after it, a change needs a new experiment protocol entry.
+#
+# Signs follow docs/03 section 4.2: x forward, y left. Braking is negative acc_long.
+version: 0.1-proposal
+
+harsh_accel:
+  acc_long_min_mps2: 2.5      # acc_long >= this
+  min_duration_s: 0.3
+  merge_gap_s: 1.0            # bursts closer than this are one event
+  min_speed_mps: 0.0
+
+harsh_brake:
+  acc_long_max_mps2: -3.0     # acc_long <= this
+  min_duration_s: 0.3
+  merge_gap_s: 1.0
+  min_speed_mps: 0.0
+
+sharp_turn:
+  abs_acc_lat_min_mps2: 2.5   # |acc_lat| >= this, either direction
+  min_duration_s: 0.5
+  merge_gap_s: 1.0
+  min_speed_mps: 3.0          # below walking-plus pace lateral readings are mostly vibration
+
+lane_weave:                   # needs lane_offset (UAH lane detection); NaN offset = no detection
+  enter_abs_offset_m: 0.5     # an excursion starts when |lane_offset| reaches this
+  exit_abs_offset_m: 0.25     # and ends when it falls back below this (hysteresis)
+  min_excursions: 3           # alternating sides: left, right, left (= two swings)
+  max_gap_s: 4.0              # largest pause between two excursions of one weave
+  min_speed_mps: 5.0
