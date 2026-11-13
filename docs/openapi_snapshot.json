@@ -1,0 +1,2164 @@
+{
+  "components": {
+    "schemas": {
+      "Alert": {
+        "additionalProperties": false,
+        "properties": {
+          "alert_id": {
+            "pattern": "^alt_[0-9a-z]+$",
+            "title": "Alert Id",
+            "type": "string"
+          },
+          "confidence": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "degraded": {
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "driver_id": {
+            "title": "Driver Id",
+            "type": "string"
+          },
+          "horizon_s": {
+            "enum": [
+              0,
+              2,
+              3,
+              5
+            ],
+            "title": "Horizon S",
+            "type": "integer"
+          },
+          "kind": {
+            "enum": [
+              "predictive",
+              "detected"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "modalities_used": {
+            "items": {
+              "enum": [
+                "camera",
+                "motion"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Modalities Used",
+            "type": "array"
+          },
+          "personalized": {
+            "title": "Personalized",
+            "type": "boolean"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason"
+          },
+          "risk_score": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Risk Score",
+            "type": "number"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "medium",
+              "high"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "t": {
+            "minimum": 0.0,
+            "title": "T",
+            "type": "number"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "string"
+          },
+          "ts": {
+            "format": "date-time",
+            "title": "Ts",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "aggressive_accel",
+              "harsh_brake",
+              "sharp_turn",
+              "lane_weave",
+              "drowsy",
+              "micro_sleep",
+              "distracted"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "alert_id",
+          "trip_id",
+          "driver_id",
+          "ts",
+          "t",
+          "type",
+          "kind",
+          "severity",
+          "risk_score",
+          "horizon_s",
+          "personalized",
+          "confidence",
+          "modalities_used",
+          "reason",
+          "degraded"
+        ],
+        "title": "Alert",
+        "type": "object"
+      },
+      "AlertReport": {
+        "additionalProperties": false,
+        "description": "Body of POST /trips/{id}/alerts: the alert the edge raised (server fills nothing in).",
+        "properties": {
+          "alert": {
+            "$ref": "#/components/schemas/Alert"
+          }
+        },
+        "required": [
+          "alert"
+        ],
+        "title": "AlertReport",
+        "type": "object"
+      },
+      "BaselineComparison": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts_if_global": {
+            "minimum": 0.0,
+            "title": "Alerts If Global",
+            "type": "integer"
+          },
+          "alerts_personalized": {
+            "minimum": 0.0,
+            "title": "Alerts Personalized",
+            "type": "integer"
+          },
+          "personalized": {
+            "title": "Personalized",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "personalized",
+          "alerts_if_global",
+          "alerts_personalized"
+        ],
+        "title": "BaselineComparison",
+        "type": "object"
+      },
+      "BaselineStat": {
+        "additionalProperties": false,
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "mean": {
+            "title": "Mean",
+            "type": "number"
+          },
+          "modality": {
+            "enum": [
+              "camera",
+              "motion"
+            ],
+            "title": "Modality",
+            "type": "string"
+          },
+          "std": {
+            "minimum": 0.0,
+            "title": "Std",
+            "type": "number"
+          }
+        },
+        "required": [
+          "feature",
+          "mean",
+          "std",
+          "modality"
+        ],
+        "title": "BaselineStat",
+        "type": "object"
+      },
+      "BaselineSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "driver_id": {
+            "title": "Driver Id",
+            "type": "string"
+          },
+          "n_windows": {
+            "minimum": 0.0,
+            "title": "N Windows",
+            "type": "integer"
+          },
+          "personalized": {
+            "title": "Personalized",
+            "type": "boolean"
+          },
+          "stats": {
+            "items": {
+              "$ref": "#/components/schemas/BaselineStat"
+            },
+            "title": "Stats",
+            "type": "array"
+          }
+        },
+        "required": [
+          "driver_id",
+          "personalized",
+          "n_windows",
+          "stats"
+        ],
+        "title": "BaselineSummary",
+        "type": "object"
+      },
+      "Calibration": {
+        "additionalProperties": false,
+        "properties": {
+          "personalized": {
+            "title": "Personalized",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "calibrating",
+              "ready",
+              "stale"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "windows_collected": {
+            "minimum": 0.0,
+            "title": "Windows Collected",
+            "type": "integer"
+          },
+          "windows_required": {
+            "exclusiveMinimum": 0.0,
+            "title": "Windows Required",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "windows_collected",
+          "windows_required",
+          "personalized"
+        ],
+        "title": "Calibration",
+        "type": "object"
+      },
+      "Device": {
+        "additionalProperties": false,
+        "properties": {
+          "model": {
+            "title": "Model",
+            "type": "string"
+          },
+          "mount": {
+            "title": "Mount",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "model",
+          "mount"
+        ],
+        "title": "Device",
+        "type": "object"
+      },
+      "Driver": {
+        "additionalProperties": false,
+        "properties": {
+          "calibration": {
+            "$ref": "#/components/schemas/Calibration"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "driver_id": {
+            "pattern": "^drv_[0-9a-z]+$",
+            "title": "Driver Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "driver_id",
+          "created_at",
+          "calibration"
+        ],
+        "title": "Driver",
+        "type": "object"
+      },
+      "ErrorBody": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "additionalProperties": true,
+            "title": "Details",
+            "type": "object"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "ErrorBody",
+        "type": "object"
+      },
+      "ErrorEnvelope": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "$ref": "#/components/schemas/ErrorBody"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "title": "ErrorEnvelope",
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_mean": {
+            "title": "Baseline Mean",
+            "type": "number"
+          },
+          "baseline_std": {
+            "minimum": 0.0,
+            "title": "Baseline Std",
+            "type": "number"
+          },
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "modality": {
+            "enum": [
+              "camera",
+              "motion"
+            ],
+            "title": "Modality",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          },
+          "z": {
+            "title": "Z",
+            "type": "number"
+          }
+        },
+        "required": [
+          "feature",
+          "value",
+          "baseline_mean",
+          "baseline_std",
+          "z",
+          "modality"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "Health": {
+        "additionalProperties": false,
+        "properties": {
+          "contract_version": {
+            "default": "0.1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "default": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_version"
+        ],
+        "title": "Health",
+        "type": "object"
+      },
+      "Reason": {
+        "additionalProperties": false,
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "modality_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "camera",
+                "motion"
+              ]
+            },
+            "title": "Modality Weights",
+            "type": "object"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "template_id": {
+            "title": "Template Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary",
+          "template_id",
+          "evidence",
+          "modality_weights"
+        ],
+        "title": "Reason",
+        "type": "object"
+      },
+      "ReplayRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "driver_id": {
+            "title": "Driver Id",
+            "type": "string"
+          },
+          "speed": {
+            "default": 1.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Speed",
+            "type": "number"
+          },
+          "trip_id": {
+            "description": "Processed trip id, e.g. own_d03_20261120_02",
+            "title": "Trip Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id",
+          "driver_id"
+        ],
+        "title": "ReplayRequest",
+        "type": "object"
+      },
+      "ReplayResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "stream_url": {
+            "title": "Stream Url",
+            "type": "string"
+          },
+          "trip_id": {
+            "pattern": "^trp_[0-9a-z]+$",
+            "title": "Trip Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id",
+          "stream_url"
+        ],
+        "title": "ReplayResponse",
+        "type": "object"
+      },
+      "RiskySegment": {
+        "additionalProperties": false,
+        "properties": {
+          "peak_risk": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Peak Risk",
+            "type": "number"
+          },
+          "t_end": {
+            "title": "T End",
+            "type": "number"
+          },
+          "t_start": {
+            "title": "T Start",
+            "type": "number"
+          },
+          "types": {
+            "items": {
+              "enum": [
+                "aggressive_accel",
+                "harsh_brake",
+                "sharp_turn",
+                "lane_weave",
+                "drowsy",
+                "micro_sleep",
+                "distracted"
+              ],
+              "type": "string"
+            },
+            "title": "Types",
+            "type": "array"
+          }
+        },
+        "required": [
+          "t_start",
+          "t_end",
+          "peak_risk",
+          "types"
+        ],
+        "title": "RiskySegment",
+        "type": "object"
+      },
+      "RoutePoint": {
+        "additionalProperties": false,
+        "properties": {
+          "lat": {
+            "title": "Lat",
+            "type": "number"
+          },
+          "lon": {
+            "title": "Lon",
+            "type": "number"
+          },
+          "t": {
+            "title": "T",
+            "type": "number"
+          }
+        },
+        "required": [
+          "t",
+          "lat",
+          "lon"
+        ],
+        "title": "RoutePoint",
+        "type": "object"
+      },
+      "Sensors": {
+        "additionalProperties": false,
+        "properties": {
+          "camera": {
+            "title": "Camera",
+            "type": "boolean"
+          },
+          "gps": {
+            "title": "Gps",
+            "type": "boolean"
+          },
+          "imu": {
+            "title": "Imu",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "camera",
+          "imu",
+          "gps"
+        ],
+        "title": "Sensors",
+        "type": "object"
+      },
+      "Step": {
+        "additionalProperties": false,
+        "properties": {
+          "mask_m": {
+            "title": "Mask M",
+            "type": "boolean"
+          },
+          "mask_v": {
+            "title": "Mask V",
+            "type": "boolean"
+          },
+          "x_m": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxItems": 14,
+            "minItems": 14,
+            "title": "X M",
+            "type": "array"
+          },
+          "x_v": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "maxItems": 16,
+            "minItems": 16,
+            "title": "X V",
+            "type": "array"
+          }
+        },
+        "required": [
+          "x_v",
+          "x_m",
+          "mask_v",
+          "mask_m"
+        ],
+        "title": "Step",
+        "type": "object"
+      },
+      "StepBatch": {
+        "additionalProperties": false,
+        "properties": {
+          "contract_version": {
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/Step"
+            },
+            "minItems": 1,
+            "title": "Steps",
+            "type": "array"
+          },
+          "t0": {
+            "minimum": 0.0,
+            "title": "T0",
+            "type": "number"
+          }
+        },
+        "required": [
+          "contract_version",
+          "t0",
+          "steps"
+        ],
+        "title": "StepBatch",
+        "type": "object"
+      },
+      "StepsAck": {
+        "additionalProperties": false,
+        "properties": {
+          "accepted": {
+            "minimum": 0.0,
+            "title": "Accepted",
+            "type": "integer"
+          },
+          "t_next": {
+            "title": "T Next",
+            "type": "number"
+          }
+        },
+        "required": [
+          "accepted",
+          "t_next"
+        ],
+        "title": "StepsAck",
+        "type": "object"
+      },
+      "TripInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "contract_version": {
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "device": {
+            "$ref": "#/components/schemas/Device"
+          },
+          "driver_id": {
+            "title": "Driver Id",
+            "type": "string"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "sensors": {
+            "$ref": "#/components/schemas/Sensors"
+          },
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id",
+          "driver_id",
+          "started_at",
+          "device",
+          "sensors",
+          "contract_version"
+        ],
+        "title": "TripInfo",
+        "type": "object"
+      },
+      "TripStartRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "contract_version": {
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "device": {
+            "$ref": "#/components/schemas/Device"
+          },
+          "driver_id": {
+            "title": "Driver Id",
+            "type": "string"
+          },
+          "sensors": {
+            "$ref": "#/components/schemas/Sensors"
+          }
+        },
+        "required": [
+          "driver_id",
+          "device",
+          "contract_version",
+          "sensors"
+        ],
+        "title": "TripStartRequest",
+        "type": "object"
+      },
+      "TripStartResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "started_at": {
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "stream_url": {
+            "title": "Stream Url",
+            "type": "string"
+          },
+          "trip_id": {
+            "pattern": "^trp_[0-9a-z]+$",
+            "title": "Trip Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id",
+          "started_at",
+          "stream_url"
+        ],
+        "title": "TripStartResponse",
+        "type": "object"
+      },
+      "TripSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "alerts_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "propertyNames": {
+              "enum": [
+                "aggressive_accel",
+                "harsh_brake",
+                "sharp_turn",
+                "lane_weave",
+                "drowsy",
+                "micro_sleep",
+                "distracted"
+              ]
+            },
+            "title": "Alerts By Type",
+            "type": "object"
+          },
+          "baseline_comparison": {
+            "$ref": "#/components/schemas/BaselineComparison"
+          },
+          "degraded_fraction": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "propertyNames": {
+              "enum": [
+                "camera",
+                "motion"
+              ]
+            },
+            "title": "Degraded Fraction",
+            "type": "object"
+          },
+          "duration_s": {
+            "minimum": 0.0,
+            "title": "Duration S",
+            "type": "number"
+          },
+          "max_risk": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Max Risk",
+            "type": "number"
+          },
+          "mean_risk": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Mean Risk",
+            "type": "number"
+          },
+          "risky_segments": {
+            "items": {
+              "$ref": "#/components/schemas/RiskySegment"
+            },
+            "title": "Risky Segments",
+            "type": "array"
+          },
+          "route": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RoutePoint"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route"
+          },
+          "trip_id": {
+            "title": "Trip Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "trip_id",
+          "duration_s",
+          "mean_risk",
+          "max_risk",
+          "alerts_by_type",
+          "risky_segments",
+          "degraded_fraction",
+          "baseline_comparison"
+        ],
+        "title": "TripSummary",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "in": "header",
+        "name": "X-API-Key",
+        "type": "apiKey"
+      }
+    }
+  },
+  "info": {
+    "description": "Canned responses for dashboard development. See docs/05_api_contract.md.",
+    "title": "Driver Risk Fusion API (mock)",
+    "version": "0.1"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/drivers": {
+      "post": {
+        "operationId": "create_driver_v1_drivers_post",
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Driver"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Create Driver",
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/v1/drivers/{driver_id}": {
+      "get": {
+        "operationId": "get_driver_v1_drivers__driver_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "driver_id",
+            "required": true,
+            "schema": {
+              "title": "Driver Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Driver"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Get Driver",
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/v1/drivers/{driver_id}/baseline": {
+      "get": {
+        "operationId": "get_baseline_v1_drivers__driver_id__baseline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "driver_id",
+            "required": true,
+            "schema": {
+              "title": "Driver Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BaselineSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Get Baseline",
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/v1/drivers/{driver_id}/calibrate": {
+      "post": {
+        "operationId": "calibrate_v1_drivers__driver_id__calibrate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "driver_id",
+            "required": true,
+            "schema": {
+              "title": "Driver Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Driver"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Calibrate",
+        "tags": [
+          "drivers"
+        ]
+      }
+    },
+    "/v1/health": {
+      "get": {
+        "operationId": "health_v1_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/v1/replay": {
+      "post": {
+        "operationId": "replay_v1_replay_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplayRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Replay",
+        "tags": [
+          "dev"
+        ]
+      }
+    },
+    "/v1/trips": {
+      "get": {
+        "operationId": "list_trips_v1_trips_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "driver_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Driver Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TripInfo"
+                  },
+                  "title": "Response List Trips V1 Trips Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "List Trips",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "operationId": "post_trip_v1_trips_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TripStartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripStartResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Post Trip",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/v1/trips/{trip_id}": {
+      "get": {
+        "operationId": "get_trip_v1_trips__trip_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripInfo"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Get Trip",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/v1/trips/{trip_id}/alerts": {
+      "get": {
+        "operationId": "list_alerts_v1_trips__trip_id__alerts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Alert"
+                  },
+                  "title": "Response List Alerts V1 Trips  Trip Id  Alerts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "List Alerts",
+        "tags": [
+          "trips"
+        ]
+      },
+      "post": {
+        "operationId": "report_alert_v1_trips__trip_id__alerts_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlertReport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Alert"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Report Alert",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/v1/trips/{trip_id}/end": {
+      "post": {
+        "operationId": "end_trip_v1_trips__trip_id__end_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "End Trip",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/v1/trips/{trip_id}/steps": {
+      "post": {
+        "operationId": "post_steps_v1_trips__trip_id__steps_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepBatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StepsAck"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Post Steps",
+        "tags": [
+          "trips"
+        ]
+      }
+    },
+    "/v1/trips/{trip_id}/summary": {
+      "get": {
+        "operationId": "get_summary_v1_trips__trip_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trip_id",
+            "required": true,
+            "schema": {
+              "title": "Trip Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          }
+        ],
+        "summary": "Get Summary",
+        "tags": [
+          "trips"
+        ]
+      }
+    }
+  }
+}
