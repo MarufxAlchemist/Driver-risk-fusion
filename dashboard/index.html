@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Driver Risk Monitor</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1b2330; --muted: #5d6877; --line: #d9dee6;
+    --accent: #2457c5; --warn: #b45309; --bad: #b42318; --ok: #1a7f4b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11151c; --card: #1a202a; --text: #e8ecf2; --muted: #a2adbb; --line: #2c3544;
+      --accent: #7aa2f7; --warn: #f0a24b; --bad: #ff7b72; --ok: #56d364;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; font-size: .9rem; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+          padding: 16px; margin-bottom: 16px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  label { font-size: .85rem; color: var(--muted); }
+  input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+          background: var(--bg); color: var(--text); min-width: 0; flex: 1 1 140px; }
+  button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent);
+           color: #fff; font: inherit; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  meter { width: 100%; height: 22px; }
+  .kv { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+        font-size: .9rem; color: var(--muted); margin-top: 8px; }
+  #banner { display: none; border-left: 4px solid var(--warn); padding: 8px 12px;
+            background: var(--card); margin-bottom: 16px; border-radius: 4px; }
+  #banner.show { display: block; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li.alert { border-top: 1px solid var(--line); padding: 10px 0; }
+  li.alert:first-child { border-top: 0; }
+  .sev-high { color: var(--bad); font-weight: 600; }
+  .sev-medium { color: var(--warn); font-weight: 600; }
+  .sev-info { color: var(--ok); font-weight: 600; }
+  .muted { color: var(--muted); font-size: .85rem; }
+  .sr { position: absolute; left: -9999px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Driver Risk Monitor</h1>
+  <p class="sub">Dashboard shell (P0). Shows the mock server's scripted sequence. No real model output.</p>
+
+  <section class="card" aria-label="Connection">
+    <div class="row">
+      <label for="key">API key</label>
+      <input id="key" value="dev-token" autocomplete="off">
+      <button id="start">Start demo trip</button>
+    </div>
+    <p id="state" class="muted" role="status">Not connected.</p>
+  </section>
+
+  <div id="banner" role="alert"></div>
+
+  <section class="card" aria-label="Current risk">
+    <label for="gauge">Risk score</label>
+    <meter id="gauge" min="0" max="1" low="0.4" high="0.7" optimum="0" value="0"></meter>
+    <div class="kv">
+      <span>t = <b id="t">0.0</b> s</span>
+      <span>Calibration: <b id="calib">-</b></span>
+      <span>Sources: <b id="mods">-</b></span>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Alert feed">
+    <h2 style="font-size:1rem;margin:0 0 8px">Alerts</h2>
+    <ul id="alerts"><li class="muted" id="none">No alerts yet.</li></ul>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var ws = null;
+
+  function setState(text) { $("state").textContent = text; }
+
+  function showBanner(text) {
+    var b = $("banner");
+    b.textContent = text;
+    b.classList.toggle("show", Boolean(text));
+  }
+
+  function addAlert(a) {
+    var none = $("none");
+    if (none) { none.remove(); }
+    var li = document.createElement("li");
+    li.className = "alert";
+    var head = document.createElement("div");
+    var sev = document.createElement("span");
+    sev.className = "sev-" + a.severity;
+    sev.textContent = a.severity.toUpperCase();
+    head.appendChild(sev);
+    head.appendChild(document.createTextNode(
+      " " + a.type + " (" + a.kind + (a.horizon_s ? ", " + a.horizon_s + " s ahead" : "") + ")"));
+    var why = document.createElement("div");
+    why.textContent = a.reason.summary;
+    var meta = document.createElement("div");
+    meta.className = "muted";
+    meta.textContent = "risk " + a.risk_score.toFixed(2) + " | confidence " +
+      a.confidence.toFixed(2) + " | t = " + a.t.toFixed(1) + " s" +
+      (a.personalized ? " | personalized" : "");
+    li.appendChild(head); li.appendChild(why); li.appendChild(meta);
+    $("alerts").prepend(li);
+  }
+
+  // The dashboard must tolerate missing or reordered messages (05 section 3.6).
+  function handle(msg) {
+    switch (msg.type) {
+      case "status":
+        $("gauge").value = msg.risk_score;
+        $("t").textContent = msg.t.toFixed(1);
+        $("calib").textContent = msg.calibration;
+        $("mods").textContent = msg.modalities_used.join(" + ");
+        break;
+      case "alert": addAlert(msg.alert); break;
+      case "degraded": showBanner(msg.modality + " unavailable (" + msg.reason + ")"); break;
+      case "recovered": showBanner(""); break;
+      case "trip_ended": setState("Trip ended."); break;
+      default: break;
+    }
+  }
+
+  $("start").addEventListener("click", async function () {
+    var key = $("key").value;
+    $("start").disabled = true;
+    $("alerts").textContent = "";
+    showBanner("");
+    try {
+      var res = await fetch("/v1/trips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": key },
+        body: JSON.stringify({
+          driver_id: "drv_demo",
+          device: { type: "browser", model: "dashboard", mount: "none" },
+          contract_version: "0.1",
+          sensors: { camera: true, imu: true, gps: false }
+        })
+      });
+      if (!res.ok) { throw new Error("start failed: HTTP " + res.status); }
+      var trip = await res.json();
+      var proto = location.protocol === "https:" ? "wss:" : "ws:";
+      ws = new WebSocket(proto + "//" + location.host + trip.stream_url +
+                         "?token=" + encodeURIComponent(key));
+      ws.onopen = function () { setState("Connected to " + trip.trip_id); };
+      ws.onmessage = function (e) {
+        try { handle(JSON.parse(e.data)); } catch (err) { /* ignore malformed message */ }
+      };
+      ws.onclose = function () { $("start").disabled = false; };
+      ws.onerror = function () { setState("WebSocket error."); };
+    } catch (err) {
+      setState(String(err.message || err));
+      $("start").disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
