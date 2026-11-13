@@ -4,6 +4,14 @@ Purpose: let workstream D build the FastAPI server and dashboard against mock da
 
 Status: DRAFT v0.1. Base path `/v1`. Freeze target: end of week 3.
 
+Changes since the first draft (all approved 2026-11-13, `contract_version` stays `"0.1"` until the freeze):
+
+- WebSocket auth by `?token=` query parameter (section 1, 3.6).
+- New WebSocket message `recovered` (section 3.6).
+- Alert `type` follows the event/state taxonomy of ADR-0007: `aggressive_accel` is now `harsh_accel`; `distraction_episode` and `aggressive` are added; predictive alerts are limited to event types (section 3.4).
+- Request and response bodies for every endpoint are listed in section 3.8.
+- Mock server location (section 5).
+
 ---
 
 ## 1. Conventions
@@ -11,7 +19,8 @@ Status: DRAFT v0.1. Base path `/v1`. Freeze target: end of week 3.
 - JSON over HTTP; live alerts over WebSocket.
 - Timestamps: ISO 8601 UTC strings for wall clock (`ts`) and float seconds for trip time (`t`).
 - IDs are opaque strings: `drv_xxxx` (driver), `trp_xxxx` (trip), `alt_xxxx` (alert).
-- Auth (demo): header `X-API-Key: <token>` from environment variable. Production auth is Future Scope.
+- Auth (demo): header `X-API-Key: <token>` on REST calls; the key comes from the environment variable `DRIVERISK_API_KEY`. Browsers cannot set headers on a WebSocket, so `/v1/trips/{trip_id}/stream` takes the same value as the query parameter `?token=<token>`. A wrong token or an unknown trip closes the socket with code 1008. Query strings can end up in server logs, so the logger must not record them; this is acceptable for a local demo only. Production auth is Future Scope.
+- `GET /v1/health` needs no key.
 - Errors: standard envelope below.
 - Pydantic models live in `src/driverisk/serving/schemas.py` and are the source of truth; this file must match them. A CI test dumps the OpenAPI schema and diffs it against `docs/openapi_snapshot.json`.
 
@@ -115,7 +124,7 @@ Lengths of `x_v` and `x_m` must equal 16 and 14 (`03_data_contract.md`). `null` 
   "driver_id": "drv_a1b2",
   "ts": "2026-11-02T09:31:12.340Z",
   "t": 745.3,
-  "type": "drowsy",
+  "type": "micro_sleep",
   "kind": "predictive",
   "severity": "high",
   "risk_score": 0.82,
@@ -140,8 +149,8 @@ Field rules:
 
 | Field | Allowed values / rule |
 |---|---|
-| `type` | `aggressive_accel`, `harsh_brake`, `sharp_turn`, `lane_weave`, `drowsy`, `micro_sleep`, `distracted` |
-| `kind` | `predictive` (risk forecast over `horizon_s`) or `detected` (already happening) |
+| `type` | Event alerts use the event names of `03_data_contract.md` section 5.2: `harsh_accel`, `harsh_brake`, `sharp_turn`, `lane_weave`, `micro_sleep`, `distraction_episode`. State alerts use the class names of section 5.1: `aggressive`, `drowsy`, `distracted` (`normal` never alerts). ADR-0007 |
+| `kind` | `predictive` (risk forecast over `horizon_s`) or `detected` (already happening). `predictive` is allowed only for event types, because the forecaster predicts event onsets (`02_architecture.md` section 4.7); a state alert is always `detected` |
 | `severity` | `info`, `medium`, `high` |
 | `risk_score` | 0-1, calibrated probability from the forecaster |
 | `horizon_s` | 2, 3 or 5 for predictive; 0 for detected |
@@ -156,14 +165,15 @@ Field rules:
 |---|---|
 | `drowsy_perclos` | "Eyes closed {pct}% of the last minute (your usual: {base}%)." |
 | `micro_sleep` | "Eyes closed for {sec} s." |
-| `yawning` | "Frequent yawning ({n} in 2 min)." |
+| `yawning` | "Frequent yawning ({n} in 2 min)." Evidence only: there is no yawning event or alert type, so this text can appear inside another alert's reason, never as `type` |
 | `distracted_gaze` | "Looking away from the road for {sec} s (your usual: {base} s)." |
 | `harsh_brake` | "Braking {val} m/s^2, well above your usual {base} m/s^2 at this speed." |
-| `aggressive_accel` | "Acceleration {val} m/s^2 vs your usual {base} m/s^2." |
+| `harsh_accel` | "Acceleration {val} m/s^2 vs your usual {base} m/s^2." |
+| `sharp_turn` | "Turning at {val} m/s^2 lateral, above your usual {base} m/s^2 at this speed." |
 | `lane_weave` | "Repeated lane drifting ({n} drifts in {sec} s)." |
 | `degraded_mode` | "Camera unavailable, using motion only." (status message, not an alert) |
 
-Templates live in `src/driverisk/explain/templates.yaml` so wording can change without code changes. Every template must degrade gracefully when no baseline is available (omit the "your usual" part).
+Templates live in `src/driverisk/explain/templates.yaml` so wording can change without code changes. Every template must degrade gracefully when no baseline is available (omit the "your usual" part). The example in 3.4 ends with "Camera is the main source."; the explainer appends that sentence from `modality_weights`, and the rule for when it does is decided in P4-C5. The `sharp_turn` wording is a first proposal.
 
 ### 3.6 WebSocket messages (server -> client)
 
@@ -173,10 +183,11 @@ Each message has `type`:
 { "type": "status", "t": 745.0, "risk_score": 0.31, "modalities_used": ["camera","motion"], "calibration": "ready" }
 { "type": "alert", "alert": { "...": "see 3.4" } }
 { "type": "degraded", "modality": "camera", "reason": "face_not_visible", "t": 750.2 }
+{ "type": "recovered", "modality": "camera", "t": 760.0 }
 { "type": "trip_ended", "trip_id": "trp_77ef" }
 ```
 
-Status messages at 1 Hz. The dashboard must tolerate missing or reordered messages.
+Status messages at 1 Hz. The dashboard must tolerate missing or reordered messages. `recovered` closes a `degraded` message for the same modality. The server closes the socket after `trip_ended`. Connect with `ws://host/v1/trips/{trip_id}/stream?token=<token>` (section 1). The messages are defined as a Pydantic discriminated union (`WsMessage` in `schemas.py`); the OpenAPI snapshot does not cover WebSocket messages, so a test validates the scripted sequence against that union.
 
 ### 3.7 Trip summary
 
@@ -196,6 +207,31 @@ Status messages at 1 Hz. The dashboard must tolerate missing or reordered messag
 
 `route` is included only if the driver consents to GPS storage.
 
+### 3.8 Request and response bodies for every endpoint
+
+Status codes and field names below are what the mock server returns; `schemas.py` is the source of truth. All error responses use the envelope in section 1.
+
+| Endpoint | Request body | Success response |
+|---|---|---|
+| `GET /v1/health` | none | `200` `{ "status": "ok", "model_version": "mock-0", "contract_version": "0.1" }` |
+| `POST /v1/drivers` | none | `201` driver object (3.1), status `calibrating`, `windows_collected` 0 |
+| `GET /v1/drivers/{driver_id}` | none | `200` driver object |
+| `GET /v1/drivers/{driver_id}/baseline` | none | `200` `{ "driver_id", "personalized", "n_windows", "stats": [ { "feature", "mean", "std", "modality" } ] }` |
+| `POST /v1/drivers/{driver_id}/calibrate` | none | `200` driver object with `windows_collected` reset to 0 |
+| `POST /v1/trips` | trip start (3.2) | `201` `{ "trip_id", "started_at", "stream_url" }` |
+| `GET /v1/trips` | none; query `driver_id`, `from`, `to` (ISO 8601) | `200` list of trip info; no pagination in v0.1 |
+| `GET /v1/trips/{trip_id}` | none | `200` `{ "trip_id", "driver_id", "started_at", "ended_at" (null while open), "device", "sensors", "contract_version" }` |
+| `POST /v1/trips/{trip_id}/steps` | step batch (3.3) | `200` `{ "accepted": <n>, "t_next": <t0 + n * 0.1> }` |
+| `POST /v1/trips/{trip_id}/alerts` | `{ "alert": <alert object 3.4> }` | `201` the stored alert object |
+| `GET /v1/trips/{trip_id}/alerts` | none | `200` list of alert objects |
+| `POST /v1/trips/{trip_id}/end` | none | `200` trip summary (3.7) |
+| `GET /v1/trips/{trip_id}/summary` | none | `200` trip summary |
+| `POST /v1/replay` | `{ "trip_id": "<processed trip id>", "driver_id", "speed": 1.0 }` | `201` `{ "trip_id", "stream_url" }` |
+
+Error codes used by the mock: `BAD_API_KEY` (401), `DRIVER_NOT_FOUND` and `TRIP_NOT_FOUND` (404), `TRIP_ALREADY_ENDED` (409, for `steps`, `alerts` and `end` on an ended trip), `CONTRACT_VERSION_MISMATCH` and `INVALID_WINDOW` (400; more than 600 steps), `VALIDATION_ERROR` (422; the response lists `loc`, `msg` and `type` and never echoes the request input).
+
+Still open (decided in P4, not in this draft): the mapping from `risk_score` to `severity`, and what `confidence` measures as opposed to `risk_score`. The mock returns fixed values.
+
 ---
 
 ## 4. Edge <-> server responsibilities
@@ -211,7 +247,7 @@ Status messages at 1 Hz. The dashboard must tolerate missing or reordered messag
 
 ## 5. Mock server requirement (week 2 stub)
 
-Workstream D ships `scripts/mock_server.py` returning canned responses for every endpoint above and emitting a scripted alert sequence on the WebSocket (calibrating -> ready -> predictive drowsy alert -> degraded camera -> recovered). Dashboard development uses it until real models exist.
+Workstream D ships a mock server returning canned responses for every endpoint above and emitting a scripted alert sequence on the WebSocket (calibrating -> ready -> predictive `micro_sleep` alert -> degraded camera -> recovered -> trip ended). The app is `src/driverisk/serving/mock_app.py`; `scripts/mock_server.py` is a thin wrapper and `make serve` starts it. The dashboard shell (`dashboard/index.html`) is served at `/dashboard/`. Dashboard development uses it until real models exist.
 
 ---
 
