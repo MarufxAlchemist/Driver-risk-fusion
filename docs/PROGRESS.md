@@ -20,13 +20,14 @@ Gate text: "make demo-stub runs stub data -> stub features -> toy fusion -> mock
 | Real server | `scripts/mock_server.py` on a socket | health, 401 without key, dashboard HTML (200), WebSocket delivered the 10 scripted messages in order over 10.4 s |
 | Contract vs code | `tests/contract/test_schema.py` | feature tables in `03` parsed and equal to `schema.py` (16 vision, 14 motion) |
 | API vs snapshot | `tests/contract/test_api.py` | OpenAPI equals `docs/openapi_snapshot.json` |
+| Clean clone of `dev` | `git clone` -> `uv sync --locked` -> lint -> pytest -> demo | sync 45 s (warm uv cache; a cold download of PyTorch will be slower), lint clean, **99 passed** (168 s), demo identical to the in-place run |
 | Stubs vs validator | `tests/contract/test_validate.py` + both stub scripts | all stub trips pass; every rule in contract section 10 has a test that it catches its violation (columns, dtype, time step, range, `inf`, 0/1 flags, undeclared all-NaN, labels, version, mask rule, meta, split leakage, missing driver, events, orphan files) |
 
 **Not verified, and why:**
 - **The dashboard page was never opened in a browser** (no browser available to me). It is served and its WebSocket target works (checked with a socket client), but rendering and the gauge/alert display are untested. Please open `make serve` -> http://127.0.0.1:8000/dashboard/ and press "Start demo trip".
 - **CI has never run** (nothing is pushed). The workflow exists but is untested on GitHub; Mac was not tested at all.
 - **The Colab notebook has not been run** on Colab/Kaggle.
-- `make setup` was not run from a clean clone (I used `uv sync` in place). Fresh-checkout install time is unmeasured.
+- `make setup` itself (which also installs pre-commit hooks) was not run; the clean clone used `uv sync --locked` directly. Only Windows was tested, not Mac.
 
 ### P0 tasks
 
