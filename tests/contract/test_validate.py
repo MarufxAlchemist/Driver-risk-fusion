@@ -138,3 +138,41 @@ def test_parquet_without_manifest_row(stub_root: Path, tmp_path: Path) -> None:
     shutil.copy(extra, tmp_path / "dmd" / "dmd_d09_20261101_01.parquet")
     report = validate_processed_dir(tmp_path / "dmd")
     assert any("no manifest row" in e for e in report.errors)
+
+
+def test_inf_is_rejected(paired_trip) -> None:
+    def mutate(df, m):
+        df.loc[3, "m_speed"] = np.float32(np.inf)
+
+    assert any("inf" in e for e in _errors_after(paired_trip, mutate))
+
+
+def test_flag_columns_must_be_zero_or_one(paired_trip) -> None:
+    def mutate(df, m):
+        df.loc[3, "v_blink"] = np.float32(0.5)
+
+    assert any("flag column v_blink" in e for e in _errors_after(paired_trip, mutate))
+
+
+def test_meta_rules() -> None:
+    from driverisk.data.validate import validate_meta
+
+    good = {
+        "trip_id": "own_d01_20261101_01",
+        "contract_version": S.CONTRACT_VERSION,
+        "sampling_rates": {},
+        "extractor_versions": {},
+        "notes": "",
+    }
+    assert validate_meta(good, "own_d01_20261101_01") == []
+    bad = {k: v for k, v in good.items() if k != "notes"}
+    assert any("missing key notes" in e for e in validate_meta(bad, "own_d01_20261101_01"))
+    assert any("trip_id" in e for e in validate_meta(good, "own_d02_20261101_01"))
+    assert any(
+        "contract_version" in e
+        for e in validate_meta({**good, "contract_version": "9"}, "own_d01_20261101_01")
+    )
+    assert any(
+        "unknown columns" in e
+        for e in validate_meta({**good, S.META_ALL_NAN_KEY: ["v_nope"]}, "own_d01_20261101_01")
+    )
