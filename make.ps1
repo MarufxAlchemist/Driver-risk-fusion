@@ -3,6 +3,17 @@
 param([Parameter(Mandatory = $true)][string]$Target)
 $ErrorActionPreference = "Stop"
 
+# uv is often installed to a folder that is not on PATH (see docs/PROGRESS.md, environment notes).
+# Add the known locations for this run only; nothing is changed permanently.
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    foreach ($dir in @("$env:USERPROFILE\.local\uv-bin", "$env:USERPROFILE\.local\bin", "$env:USERPROFILE\.cargo\bin")) {
+        if (Test-Path (Join-Path $dir "uv.exe")) { $env:Path = "$dir;$env:Path"; break }
+    }
+}
+if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
+    Write-Error "uv not found. Install it (https://docs.astral.sh/uv/) or add its folder to PATH."
+}
+
 function Run([string[]]$cmd) {
     & $cmd[0] $cmd[1..($cmd.Length - 1)]
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
