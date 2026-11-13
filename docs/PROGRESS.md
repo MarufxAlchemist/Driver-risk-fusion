@@ -144,7 +144,44 @@ A10 and A11 were approved and `05` was edited to match; `contract_version` stays
 2. **Open the dashboard** once and tell me whether it looks right (`make serve`, then http://127.0.0.1:8000/dashboard/, "Start demo trip"). The alert type shown is now `micro_sleep` (predictive).
 3. ~~History rewrite~~ **Decided: leave it for now** (risk R21).
 4. **Start the long-lead human tasks** (`docs/human_tasks/README.md`): DMD registration and UAH download (H1), missing papers (H10), guide meeting (H5), phone and passenger for the app test (H4, H6).
-5. Say **go for P1**. Until the datasets exist, P1 can start with motion features (P1-B2), the metrics library (P2-C1, moved up), event detector, and vision features on your webcam.
+5. ~~Say go for P1~~ **Given 2026-11-13 ("go ahead for the next hour, do what is best").**
+6. **Agree the event thresholds** in `configs/events.yaml` with the guide (they are my proposals, see below).
 
-## Next (P1, after your go)
-Order from the analysis: normalization/augmentation, experiment logging, metrics library, motion features and events, MediaPipe vision features, then loaders once downloads exist.
+## Next (P1, remaining)
+Not started: dataset augmentation (P1-C3), MediaPipe vision features and causal PERCLOS (P1-A1/A2; needs `mediapipe` added to the lock file, ADR-0006, and your webcam), then the loaders UAH (P1-B1), DMD (P1-A3), splits script (P1-C2) and label maps (P1-C1), which wait for the downloads (H1). The own-data pipeline (P1-D1) waits for the phone-app test (H4).
+
+---
+
+## P1 work log (2026-11-13, autonomous hour after "go")
+
+Branches `fix/d-make-ps1-uv-path`, `feat/c-metrics`, `feat/d-experiment-log`, `feat/b-motion-features`, `feat/b-events`, all merged into `dev` with `--no-ff`. Tests: **175 passed** (102 before this hour), lint clean. Every module was written test-first; the expected numbers in the metric tests are worked out by hand in comments.
+
+| Task | State | What it is |
+|---|---|---|
+| `make.ps1` finds uv | done | `make serve` now works in a fresh PowerShell; tested with uv off PATH |
+| P2-C1 metrics library (moved up) | done, synthetic cases only | `evaluation/metrics.py`: macro-F1, per-class P/R/F1, confusion matrix, balanced accuracy, ECE (classes and binary), Brier, PR-AUC per horizon, alerting metrics (FA/h, recall, lead time, early-warning rate), pooling over trips, `alerts_from_scores`, `select_threshold` |
+| Robustness degradations (04 §3.4, F24) | done | `evaluation/robustness.py`: modality masking (random or contiguous), noise at a given SNR, time-offset shift, `robustness_curve`. "Phone moved" is not here: it needs the raw IMU, so it goes with the motion code |
+| P1-D4 experiment logging | done | `utils/experiment.py` + `experiments/README.md`: run folder, config/meta/metrics, `results.csv` |
+| P1-B2 motion features | done on **synthetic data only** | `features/motion.py`: all 14 features from raw phone IMU + GPS, causal. On a synthetic drive with a rotated phone it recovers `acc_long`/`acc_lat` with RMSE 0.024 m/s^2 and correlation above 0.999 |
+| P1-B3 event detector | done on synthetic frames only | `features/events.py` + `configs/events.yaml`: harsh_accel, harsh_brake, sharp_turn, lane_weave |
+| P1-C3 normalization | already done in P0 (`NormStats`); **augmentation not started** | |
+
+### New assumptions (please confirm or overrule)
+
+| ID | Assumption | Where |
+|---|---|---|
+| A16 | Macro-F1 averages over the classes present in the truth (UAH has no `distracted`, DMD no `aggressive`); pass `classes=` to force a set. A class that is predicted but absent from the truth counts as errors for the true class, not as a zero-F1 term | `metrics.macro_f1` (F15) |
+| A17 | Alerting rules (fix F15): an event's window is `[onset - 5 s, offset + 2 s]`; an alert inside any event window, certain or uncertain, is never a false alarm; an event is detected by an alert in `[onset - 5 s, offset]`, lead time = onset minus the earliest such alert (negative = late); FA/h = false alarms / hours outside all event windows, excluded (posed) time and, if given, outside the evaluated range (UAH: speed above 50 km/h); trips pool by summing counts. `doc 04` still says something looser; **not edited** | `metrics.alerting_metrics` |
+| A18 | Forward axis from regression of horizontal acceleration on the GPS speed change over the whole trip, up axis from stationary moments (fallback: trip mean). Replaces the contract's "first stationary-to-driving transition". Alignment fails cleanly (axis features NaN) when the speed profile has no acceleration | `motion.estimate_alignment` |
+| A19 | `speed` and `heading_rate` are **held** from the latest GPS fix (NaN and `gps_valid = 0` after 2 s), not interpolated, so the features are causal and identical on the phone. The contract word "interpolated" is not followed | `motion.py` |
+| A20 | Sign convention: left turn is positive for `acc_lat`, `yaw_rate` and `heading_rate` (`heading_rate = -d(compass)/dt`). The UAH yaw sign still has to be checked on the real files (F25) | `motion.py` |
+| A21 | `lateral_drift_5s` without lane data is a proxy (std over 5 s of the detrended double integral of `acc_lat`); an indicator of weaving, not a lane position | `motion.py` |
+| A22 | Run folders live in `experiments/runs/<run_id>/` (already git-ignored), not `experiments/<run_id>/` as `04` and CONTRIBUTING say; `results.csv` stays in `experiments/` | `utils/experiment.py` |
+| A23 | Event thresholds in `configs/events.yaml` (harsh accel +2.5, harsh brake -3.0, sharp turn 2.5 m/s^2, lane weave 0.5 m with 3 excursions) are **my placeholders**, not from a paper. Per the contract they must be agreed with the guide and then frozen before any model evaluation | `configs/events.yaml` |
+
+### Not verified (honest list)
+- **Nothing here has touched real data.** Motion features and events are checked on synthetic signals I generated; they may still break on real phone logs (clock jitter, irregular sampling, spikes, phones that report linear acceleration instead of raw). Run `scripts/check_phone_log.py` and then the extractor on the first real pilot trip.
+- The synthetic phone has no gyro bias, no GPS outliers and perfectly regular 50 Hz IMU timing.
+- UAH specifics (G units, Z longitudinal, km/h, yaw angle sign) are not applied anywhere yet; that is the UAH loader (P1-B1).
+- The metrics library was not cross-checked against sklearn (not a dependency); expected values were computed by hand.
+- Doc `04` was not updated for A16, A17 and A22.
