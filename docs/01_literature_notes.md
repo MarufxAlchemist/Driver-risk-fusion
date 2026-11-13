@@ -6,9 +6,9 @@ Purpose: one place that says what each reference is, why it is in the project, a
 
 ---
 
-## 1. Canonical reference list (R1-R11)
+## 1. Canonical reference list (R1-R12)
 
-IEEE format. These IDs (R1-R11) are the canonical numbering for all repo docs.
+IEEE format. These IDs (R1-R12) are the canonical numbering for all repo docs. R12 is a supplementary preprint from another domain.
 
 | ID | Citation | Link |
 |---|---|---|
@@ -23,6 +23,7 @@ IEEE format. These IDs (R1-R11) are the canonical numbering for all repo docs.
 | R9 | X. Chen, Y. Wang, X. Sun, Y. Cai, "Unsupervised cross-scenario abnormal driving behavior recognition using smartphone sensor data," *IEEE Internet Things J.*, early access, 2023. | https://ieeexplore.ieee.org/document/10365683 |
 | R10 | J. D. Ortega et al., "DMD: A large-scale multi-modal driver monitoring dataset for attention and alertness analysis," *ECCV 2020 Workshops*. | https://arxiv.org/abs/2008.12085 , dataset: https://dmd.vicomtech.org/ |
 | R11 | E. Romera, L. M. Bergasa, R. Arroyo, "Need data for driver behaviour analysis? Presenting the public UAH-DriveSet," *ITSC*, 2016. | https://doi.org/10.1109/ITSC.2016.7795584 , reader: https://github.com/Eromera/uah_driveset_reader |
+| R12 | Tian et al., "Ultra-Fusion" (full title and author list to be copied from the PDF; not recorded in the repo), arXiv:2606.21223, June 2026. **Unreviewed preprint on SLAM, not driver monitoring.** | https://arxiv.org/abs/2606.21223 |
 
 ### Numbering mismatch to fix in the first-presentation deck
 
@@ -76,34 +77,40 @@ Template per paper: what it is, why we need it, what we claim, limits, likely gu
 ### R1 Kashevnik et al. (2021): distraction detection review
 - **What:** literature review and framework of driver distraction detection methods.
 - **Why we need it:** establishes the taxonomy of distraction (visual, manual, cognitive) and the limits of camera-only approaches.
-- **We claim:** cognitive distraction is hard to see from a camera alone, which motivates adding motion signals.
+- **We claim:** R1 says there is currently no non-intrusive way to measure a driver's mental state, and that driving-style signals give *indirect* evidence of distraction when compared with the same driver's usual parameters recorded earlier (R1 sections IV-A and IV-B). That supports adding motion signals and, in particular, comparing against a personal baseline.
+- **Do not claim:** that R1 shows motion detects cognitive distraction. It does not; it describes indirect evidence only.
 - **Limits:** a review, so no experiments of its own that we can reuse.
-- **Guide question:** "Why not just use a camera?" Answer: the camera misses cognitive distraction and degrades with lighting and occlusion; vehicle motion provides independent evidence.
+- **Guide question:** "Why not just use a camera?" Answer: a camera degrades with lighting and occlusion and cannot see the mental state directly; vehicle motion is independent, indirect evidence, most useful relative to the driver's own usual behaviour (R1).
 - Verified by reading: [ ]
 
 ### R2 Wang et al. (2022): in-vehicle camera behaviour survey
 - **What:** survey of driver behavior analysis from in-vehicle cameras.
 - **Why:** vision-only tradition, its tasks, datasets and failure modes (lighting, occlusion, camera position).
 - **We claim:** vision-only systems share known failure modes that a second modality can cover.
+- **Prior camera + sensor fusion exists (R2 section III-B, Table XVIII):** Streiffer et al. (driver-face camera + mobile IMU, InceptionV3 + LSTM, 87.02% on a private set), Omerustaoglu et al. (vision + vehicle sensors, about 9 points gain to 85%) and Ou et al. (head pose + distraction + speed). **Do not claim "first camera + IMU fusion".** The novelty is the *combination*: degradation-robust fusion + personal baseline + early prediction + explanations. These three papers are not in the repo and must be read (human task H10).
+- **Brain4Cars** (R2 section III-C): driver-face video + speed + GPS, 10 drivers, 594 five-second clips, time-to-maneuver metric. It is not phone IMU and not abnormal driving, so it does not change ADR-0003.
+- **Camera placement:** R2's conclusion says gaze accuracy was not observed to depend clearly on camera placement, while R4 reports a clear effect for drowsiness. Cite both and keep the claim modest.
 - Verified by reading: [ ]
 
 ### R3 Wang, Wu, Niu (2020): multi-sensor fusion survey
 - **What:** survey of multi-sensor fusion in automated driving.
 - **Why:** background for fusion levels (early, feature-level, late) and why synchronization is hard.
 - **We claim:** fusing complementary sensors gives a more complete picture than any single sensor.
-- **Limits:** about automated driving perception (lidar, radar, camera), not driver monitoring. Cite it for the fusion principle only.
-- **Guide question:** "Why cross-attention rather than concatenation?" Answer: concatenation weights all sources equally and breaks when one is missing; cross-attention lets each stream query the other and can ignore a degraded one (we test this in ablation A3 vs A4/A5).
+- **Limits:** about automated driving perception (lidar, radar, camera), not driver monitoring. Cite it for the fusion principle only. It does **not** discuss cross-attention, missing modalities or modality dropout; those arguments need other support or our own ablations. It does cover fusion levels, time-space alignment and camera degradation (detection drops of 31.1-60.4% under image corruptions).
+- **Guide question:** "Why cross-attention rather than concatenation?" Answer: that is a hypothesis we test, not something R3 shows. Concatenation weights all sources equally and gives the model no explicit way to ignore a missing one; cross-attention with masks and gates can. Ablations A2 vs A3 (`04_experiment_protocol.md` section 5) test it.
 - Verified by reading: [ ]
 
 ### R4 Rozaimi et al. (2023): drowsiness and camera position
 - **What:** deep-learning drowsiness detection compared across camera positions.
 - **Why:** shows camera placement changes accuracy, which matters for a phone on a dashboard or windshield.
-- **We claim:** placement variability is a real deployment issue; our data collection protocol fixes and records mount position.
+- **We claim:** placement variability is a real deployment issue; our data collection protocol fixes and records mount position. R4 reports 58.3-85.5% depending on camera position and model, with the middle position best; it is a single split and a single run, so treat the numbers as indicative.
 - Verified by reading: [ ]
 
 ### R5 Kose et al. (2019): CNN spatio-temporal driver state
 - **What:** real-time driver state monitoring using a CNN-based spatio-temporal approach.
 - **Why:** early evidence that modeling time beats frame-by-frame classification, and that this can run in real time.
+- **Not a 3D CNN:** R5 uses a 2D BN-Inception on 4-8 sparsely sampled frames with concatenated features (R5 section III). It supports "temporal modelling helps" and is closer to our 2D+LSTM baseline than to the 3D-CNN. Do not cite it for "why 3D CNN".
+- **Evidence for ADR-0005:** R5 reports 99.10% where the same drivers appear in train and test, against 92.67-94% in subject-disjoint 5-fold cross-validation on RGB (R5 sections IV-A, IV-B, Table IV). That gap is the reason our splits are by driver.
 - Verified by reading: [ ]
 
 ### R6 Tan et al. (2024): distraction recognition review
@@ -121,7 +128,9 @@ Template per paper: what it is, why we need it, what we claim, limits, likely gu
 ### R8 Liao et al. (2025): personalization in driving behavior
 - **What:** review of dataset, modeling and validation for personalized driving behavior.
 - **Why:** our strongest novelty anchor. It frames personalization as an open direction.
-- **We claim:** per-driver modelling is recognised as an open problem; most deployed systems use one fixed global threshold.
+- **We claim:** per-driver modelling is recognised as an open direction. R8 section VI-A notes that there are no open personalized datasets and that thresholds and triggers for model updates are unexplored.
+- **Do not claim:** that R8 says "most deployed systems use one fixed global threshold". It does not say that.
+- **Safety warning to respect:** R8 section VI-E warns that over-personalization "could compromise safety". Our design needs an absolute safety floor that no personal baseline can lower (fix F14, to be specified in `02_architecture.md` and `04`).
 - **Limits:** do not claim "no one has done personalization". Claim: we combine it with fusion and early prediction on edge.
 - **Guide question:** "Is personalization really new?" Answer: it is an open direction per R8; our contribution is combining it with fused sensing and early prediction, with measured benefit.
 - Verified by reading: [ ]
@@ -156,16 +165,22 @@ Difference table (fill after reading R9):
 - **Known caveat to confirm:** drowsy and aggressive behaviours are driver-performed styles per trip, so labels are trip-level, not event-level.
 - Verified by reading: [ ]
 
+### R12 Ultra-Fusion (arXiv 2606.21223, 2026): robust multi-sensor fusion, SLAM
+- **What:** an unreviewed preprint on robust sensor fusion for SLAM. Different domain from ours.
+- **Why:** three ideas we can borrow and cite only as principles: per-modality reliability scores with **hysteresis** (R12 section III-D/E), cross-correlation estimation of time offsets between sensors, and staged degradation tests including injected delays.
+- **We claim:** the robust-fusion principle only, labelled as a preprint from another domain. Do not cite its numbers.
+- Verified by reading: [ ] (read in full by Claude on 2026-11-05 for the analysis; Maruf has not)
+
 ---
 
 ## 4. Likely guide questions
 
 | Question | Short answer | Backed by |
 |---|---|---|
-| What is new here? | Graceful-degradation fusion + per-driver baseline + early prediction with explanations, in one edge-deployable system | R3, R8, R9, ablation plan |
+| What is new here? | Graceful-degradation fusion + per-driver baseline + early prediction with explanations, in one edge-deployable system. Not "first camera + IMU fusion": see R2 section III-B | R2, R3, R8, R9, ablation plan |
 | Why not camera only? | Misses vehicle-motion evidence and fails under lighting, occlusion, placement | R1, R2, R4 |
 | Why not sensors only? | Misses eye closure, gaze, head pose | R1, R9 |
-| Why 3D CNN? | Models time; reported to beat 2D CNN; can be pruned for edge. We validate it against 2D+LSTM | R5, R6, R7 |
+| Why 3D CNN? | Models time; reported to beat 2D CNN; can be pruned for edge. We validate it against 2D+LSTM. (R5 supports temporal modelling in general, not 3D CNNs) | R6, R7 (R5 for temporal modelling) |
 | Can it run on a phone? | Edge-first design, ONNX export, latency measured in P5 | R7 |
 | Where does the data come from? | UAH-DriveSet, DMD, plus our own paired recordings | R10, R11 |
 | How do you evaluate personalization? | Within-driver temporal split: calibrate on first trips, test on later ones | `04_experiment_protocol.md` |
