@@ -1,6 +1,6 @@
 # ADR-0007: Driver keys and the class / event / alert taxonomy
 
-Status: Proposed (part 1 implemented, part 2 needs your decision)
+Status: Accepted 2026-11-13 (Maruf approved both parts; both implemented)
 Date: 2026-11-13
 Deciders: Maruf (Claude drafted)
 
@@ -14,7 +14,7 @@ Deciders: Maruf (Claude drafted)
 ## Decision
 **Part 1 (implemented).** The global driver key is `<dataset>:<driver_id>` (`schema.driver_key`). Splits, the leakage check and `WindowDataset.driver_id` use it. Anonymous tokens stay `d03` inside each dataset; the API maps `drv_xxxx` to the key on the server.
 
-**Part 2 (proposal, not implemented).**
+**Part 2 (implemented in `serving/schemas.py`; documented in `05` section 3.4).**
 - Keep classes and events as in `03`.
 - Alerts about events use the event name (`harsh_accel`, not `aggressive_accel`; `distraction_episode`).
 - Alerts about a state use the class name (`drowsy`, `distracted`, `aggressive`).
@@ -22,5 +22,5 @@ Deciders: Maruf (Claude drafted)
 - Add a `sharp_turn` template.
 
 ## Consequences
-- Part 2 changes `05` (and the API snapshot), so it needs your approval and a version bump. Until then the mock server and `scripts/demo_stub.py` keep the `05` names, and the demo maps classes to alert types with a clearly labelled demo-only table.
+- Part 2 changed `05` and the API snapshot. `contract_version` stays `"0.1"` until the freeze. A test pins `AlertType` to `schema.EVENT_TYPES + schema.CLASSES[1:]`, so the three lists cannot drift apart again. The stub demo maps a class decision to the class name (a state alert).
 - Wrong if: the guide wants alert names that match the classes exactly. Then drop the event/state split and rename events instead.
