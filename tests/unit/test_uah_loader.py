@@ -438,6 +438,6 @@ def test_resample_last_is_causal() -> None:
     # step 0 = (-0.1, 0], step 1 = (0, 0.1], step 2 = (0.1, 0.2], step 3 = (0.2, 0.3]
     out = F.resample_last(t, x, 4)
     assert out[:3] == pytest.approx([1.0, 3.0, 4.0]) and np.isnan(out[3])
-    x[3] = np.nan  # a NaN latest sample: skipped by default, kept with keep_nan
-    assert F.resample_last(t, x, 4)[2] == pytest.approx(3.0)
-    assert np.isnan(F.resample_last(t, x, 4, keep_nan=True)[2])
+    x[2] = np.nan  # step 1's latest sample is NaN: skipped by default, kept with keep_nan
+    assert F.resample_last(t, x, 4)[1] == pytest.approx(2.0)
+    assert np.isnan(F.resample_last(t, x, 4, keep_nan=True)[1])
