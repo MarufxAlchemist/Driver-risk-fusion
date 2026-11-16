@@ -1,0 +1,18 @@
+# Own-recording pipeline (src/driverisk/data/own.py, docs/03 section 8, docs/06 sections 5 and 9).
+#
+# STATUS: PROPOSED VALUES. The sync limits come from the contract (03 section 8: residual target
+# 100 ms, drift correction above 50 ms); the search window, the stationary speed and the clock-rate
+# limit are my choices and have not been checked on a real recording.
+version: 0.1-proposal
+
+sync:
+  search_s: 120.0             # look for the start tap pair in the first / end pair in the last N s
+  max_speed_mps: 0.5          # taps happen "before moving" / "after stopping" (06 section 5)
+  drift_correction_min_s: 0.05  # contract 8.4: correct linear drift only above 50 ms per trip
+  residual_max_s: 0.1         # contract 8.2: residual offset target
+  max_rate_error: 0.01        # |video/phone clock rate - 1| above this = the sync events do not match
+
+quality:                      # 06 section 9; a failed check makes the trip quality "low"
+  face_visible_min: 0.85
+  imu_max_gap_s: 0.5
+  gps_valid_min: 0.90
