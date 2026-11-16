@@ -4,6 +4,9 @@
     uv run python scripts/webcam_features.py --seconds 60            # webcam 0
     uv run python scripts/webcam_features.py --video clip.mp4
 
+A live preview window shows you (mirrored) with the eye/iris/mouth points and the values the
+extractor reads; press q or Esc to stop early. `--no-preview` runs without a window.
+
 Writes `<out>/vision_features.parquet` (git-ignored) and `<out>/vision_features.png`, and prints
 a short summary. Nothing is recorded: frames are processed in memory and discarded.
 
@@ -36,11 +39,24 @@ def main() -> None:
     ap.add_argument("--seconds", type=float, default=30.0)
     ap.add_argument("--out", type=Path, default=repo_root() / "demo_out" / "vision")
     ap.add_argument("--ear-threshold", type=float, default=None)
+    ap.add_argument("--no-preview", action="store_true", help="run without the live window")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     source = args.video if args.video else args.camera
-    t, lm, mats, size = FL.run_on_frames(FL.video_frames(source, args.seconds))
+    preview = None
+    if not args.no_preview:
+        from driverisk.features.preview import LivePreview
+
+        preview = LivePreview(ear_threshold=args.ear_threshold)
+        print("Preview open: turn to your right, look up, blink, close your eyes 2 s. q/Esc stops.")
+    try:
+        t, lm, mats, size = FL.run_on_frames(
+            FL.video_frames(source, args.seconds), on_frame=preview
+        )
+    finally:
+        if preview is not None:
+            preview.close()
     t = t - t[0]
     res = V.extract_vision_features(t, lm, mats, ear_threshold=args.ear_threshold, image_size=size)
     args.out.mkdir(parents=True, exist_ok=True)

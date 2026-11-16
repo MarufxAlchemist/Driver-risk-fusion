@@ -31,3 +31,18 @@ def test_timestamps_are_forced_to_increase() -> None:
     with FL.FaceLandmarkerAdapter() as adapter:
         adapter.process(blank, 1.0)
         adapter.process(blank, 1.0)  # same time again must not raise
+
+
+def test_on_frame_callback_sees_every_frame_and_can_stop_the_run() -> None:
+    blank = np.full((120, 160, 3), 90, dtype=np.uint8)
+    seen: list[float] = []
+
+    def stop_after_three(t_s, rgb, lm, mat) -> bool:
+        assert rgb.shape == (120, 160, 3) and lm.shape == (FL.N_LANDMARKS, 3)
+        seen.append(t_s)
+        return len(seen) < 3
+
+    t, lm, mats, size = FL.run_on_frames(
+        ((k / 10, blank) for k in range(20)), on_frame=stop_after_three
+    )
+    assert len(seen) == 3 and len(t) == 3 and size == (160, 120)

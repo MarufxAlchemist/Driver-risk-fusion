@@ -12,7 +12,7 @@ the left/right conventions in `vision.py` assume the raw camera image).
 from __future__ import annotations
 
 import urllib.request
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import numpy as np
@@ -93,13 +93,21 @@ class FaceLandmarkerAdapter:
         self.close()
 
 
+FrameCallback = Callable[[float, np.ndarray, np.ndarray, np.ndarray], bool]
+
+
 def run_on_frames(
-    frames: Iterator[tuple[float, np.ndarray]], model_path: Path | None = None
+    frames: Iterator[tuple[float, np.ndarray]],
+    model_path: Path | None = None,
+    on_frame: FrameCallback | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[int, int]]:
     """`(t_s, rgb)` pairs -> `(t [F], landmarks [F, 478, 3], matrices [F, 4, 4], (W, H))`.
 
     Pass `(W, H)` to `vision.extract_vision_features(image_size=...)`: MediaPipe's normalized
     coordinates are only proportional on square images.
+
+    `on_frame(t_s, rgb, landmarks, matrix)` is called after every frame (for a live preview);
+    returning False stops the run early. The frames seen so far are still returned.
     """
     ts, lms, mats = [], [], []
     size: tuple[int, int] | None = None
@@ -114,6 +122,8 @@ def run_on_frames(
             ts.append(t_s)
             lms.append(lm)
             mats.append(mat)
+            if on_frame is not None and not on_frame(t_s, rgb, lm, mat):
+                break
     if not ts or size is None:
         raise ValueError("no frames")
     return np.array(ts), np.stack(lms), np.stack(mats), size
