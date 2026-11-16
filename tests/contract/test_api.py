@@ -253,3 +253,25 @@ def test_dashboard_shell_is_served(client: TestClient) -> None:
         assert needle in page.text
     # Alert text comes from the server; it must never be inserted as markup.
     assert "innerHTML" not in page.text
+
+
+def test_trip_is_marked_ended_once_its_stream_has_finished(
+    client: TestClient, trip_id: str
+) -> None:
+    assert client.get(f"/v1/trips/{trip_id}", headers=H).json()["ended_at"] is None
+    with client.websocket_connect(f"/v1/trips/{trip_id}/stream?token={KEY}") as ws:
+        while True:
+            try:
+                ws.receive_text()
+            except Exception:  # the server closes after trip_ended
+                break
+    assert client.get(f"/v1/trips/{trip_id}", headers=H).json()["ended_at"] is not None
+    _err(client.post(f"/v1/trips/{trip_id}/end", headers=H), 409, "TRIP_ALREADY_ENDED")
+
+
+def test_demo_driver_profile_agrees_with_the_scripted_stream(client: TestClient) -> None:
+    """The stream says calibration is ready and the alert is personalized; so must the profile."""
+    demo = M.Driver.model_validate(client.get("/v1/drivers/drv_demo", headers=H).json())
+    assert demo.calibration.status == "ready" and demo.calibration.personalized
+    fresh = M.Driver.model_validate(client.post("/v1/drivers", headers=H).json())
+    assert fresh.calibration.status == "calibrating"  # new drivers still start cold
