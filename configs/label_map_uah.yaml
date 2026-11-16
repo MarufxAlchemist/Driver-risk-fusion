@@ -1,0 +1,13 @@
+# UAH-DriveSet behaviour -> y_cls (docs/03_data_contract.md section 5.1).
+#
+# STATUS: PROPOSAL, TO REVIEW with the team / guide before the contract freeze (P0-C2).
+# UAH behaviour is a trip-level driving style (contract 5.3): every step of a trip gets the
+# trip's class. The behaviour name is read from the route folder name (uah_inspect.FOLDER_RE),
+# upper-cased. A behaviour that is not listed here stops the loader with an error.
+# Values must be class names from driverisk.data.schema.CLASSES; null = unlabelled (y_cls -1).
+version: 0.1-proposal
+dataset: uah
+behaviour_to_class:
+  NORMAL: normal
+  DROWSY: drowsy
+  AGGRESSIVE: aggressive
