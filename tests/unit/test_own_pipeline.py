@@ -38,12 +38,12 @@ LOWCONF_PHONE = (70.0, 71.0)
 BRAKE_PHONE = 85.0
 
 
-def video_to_phone(tv):
-    return OFFSET + np.asarray(tv, dtype=np.float64) * (1.0 + R)
+def video_to_phone(tv, rate: float = R):
+    return OFFSET + np.asarray(tv, dtype=np.float64) * (1.0 + rate)
 
 
-def phone_to_video(tp):
-    return (np.asarray(tp, dtype=np.float64) - OFFSET) / (1.0 + R)
+def phone_to_video(tp, rate: float = R):
+    return (np.asarray(tp, dtype=np.float64) - OFFSET) / (1.0 + rate)
 
 
 def _rot(axis: str, deg: float) -> np.ndarray:
@@ -95,12 +95,12 @@ def make_phone(taps=TAPS, seed: int = 0) -> tuple[pd.DataFrame, pd.DataFrame]:
     return imu, gps
 
 
-def _inside(tv: np.ndarray, span: tuple[float, float]) -> np.ndarray:
-    p = video_to_phone(tv)
+def _inside(tv: np.ndarray, span: tuple[float, float], rate: float = R) -> np.ndarray:
+    p = video_to_phone(tv, rate)
     return (p >= span[0]) & (p <= span[1])
 
 
-def make_vision_features() -> pd.DataFrame:
+def make_vision_features(rate: float = R) -> pd.DataFrame:
     """A 10 Hz vision-features table on the video clock, as scripts/webcam_features.py writes."""
     tv = np.round(np.arange(0, round(VIDEO_END / S.STEP_S) + 1) * S.STEP_S, 6)
     n = len(tv)
@@ -109,14 +109,14 @@ def make_vision_features() -> pd.DataFrame:
     cols["mar"] = np.full(n, 0.2)
     cols["face_conf"] = np.full(n, 0.95)
     cols["face_visible"] = np.ones(n)
-    closed = _inside(tv, CLOSURE_PHONE)
+    closed = _inside(tv, CLOSURE_PHONE, rate)
     for name in ("ear_left", "ear_right", "ear_mean"):
         cols[name][closed] = 0.1
     cols["eye_closed"][closed] = 1.0
     for name in ("perclos_30s", "perclos_60s"):
         cols[name][:100] = np.nan
-    cols["face_conf"][_inside(tv, LOWCONF_PHONE)] = 0.3
-    none = _inside(tv, NOFACE_PHONE)
+    cols["face_conf"][_inside(tv, LOWCONF_PHONE, rate)] = 0.3
+    none = _inside(tv, NOFACE_PHONE, rate)
     for name in S.VISION_NAMES:
         if name not in ("face_conf", "face_visible"):
             cols[name][none] = np.nan
@@ -180,6 +180,14 @@ def trip(phone: own.PhoneData) -> own.OwnTrip:
 
 def _phone_time(trip: own.OwnTrip, tau: np.ndarray) -> np.ndarray:
     return np.asarray(tau, dtype=np.float64) + trip.meta["trip_start_phone_s"]
+
+
+def _mapping_error(trip: own.OwnTrip, rate: float = R) -> float:
+    """Largest error of the estimated video -> phone map over the whole video, in seconds."""
+    tv = np.linspace(0.0, VIDEO_END, 301)
+    sync = trip.meta["sync"]
+    est = sync["intercept_s"] + sync["scale"] * tv
+    return float(np.abs(est - video_to_phone(tv, rate)).max())
 
 
 # --- names (fix F11) ------------------------------------------------------------------------
@@ -267,7 +275,8 @@ def test_phone_logs_share_one_clock_and_units(phone: own.PhoneData) -> None:
     assert phone.t_acc[0] == 0.0 and phone.t_gps[0] == pytest.approx(1.0, abs=1e-6)
     assert phone.imu_rate_hz == pytest.approx(50.0, rel=1e-3)
     assert phone.gps_rate_hz == pytest.approx(1.0, rel=1e-3)
-    assert np.abs(phone.gyro_dps).max() == pytest.approx(8.0, rel=1e-6)  # rad/s converted
+    rate = np.linalg.norm(phone.gyro_dps, axis=1).max()
+    assert rate == pytest.approx(8.0, rel=1e-6)  # rad/s converted to deg/s
     assert np.median(np.linalg.norm(phone.acc, axis=1)) == pytest.approx(G, abs=0.1)
 
 
@@ -304,6 +313,7 @@ def test_recovered_sync_is_within_target(trip: own.OwnTrip) -> None:
     assert abs(sync["offset_start_s"] - true_start) <= FINE  # one IMU sample
     assert sync["drift_s"] == pytest.approx(0.04, abs=0.01)
     assert sync["residual_s"] < 0.1
+    assert _mapping_error(trip) < 0.1  # true residual over the whole video, not only at taps
     assert sync["video_sync_source"] == "trip_sheet" and sync["imu_sync_source"] == "detected"
 
 
@@ -319,6 +329,23 @@ def test_vision_markers_land_at_the_right_trip_time(trip: own.OwnTrip) -> None:
     assert abs(_phone_time(trip, tau[noface][0]) - NOFACE_PHONE[0]) <= S.STEP_S + 1e-6
     lowconf = (df["v_face_visible"] == 1) & (df["v_face_conf"] < 0.5)
     assert abs(_phone_time(trip, tau[lowconf.to_numpy()][0]) - LOWCONF_PHONE[0]) <= 0.1 + 1e-6
+
+
+def test_large_drift_is_corrected_end_to_end(phone: own.PhoneData) -> None:
+    rate = 0.4 / (TAPS[2] - TAPS[0])  # 400 ms over the trip: without correction, markers miss
+    sync_times = [round(float(phone_to_video(TAPS[i], rate)), 3) for i in (0, 2)]
+    vision = own.VisionFeatures(make_vision_features(rate))
+    trip = own.process_own_trip(TRIP, phone, vision, trip_sheet(), video_sync_s=sync_times)
+    sync = trip.meta["sync"]
+    assert sync["drift_corrected"] and sync["drift_s"] == pytest.approx(0.4, abs=0.01)
+    assert sync["scale"] == pytest.approx(1 + rate, abs=1e-4)
+    assert _mapping_error(trip, rate) < 0.02  # residual over the whole video, target 0.1 s
+    df = trip.frame
+    tau = df[S.COL_T].to_numpy(np.float64)
+    closed = df["v_eye_closed"].to_numpy(np.float64) == 1.0
+    # the marker sits on the 0.1 s video grid and is resampled by nearest neighbour: 1.5 steps
+    for got, want in ((tau[closed][0], CLOSURE_PHONE[0]), (tau[closed][-1], CLOSURE_PHONE[1])):
+        assert abs(_phone_time(trip, got) - want) <= 1.5 * S.STEP_S + 0.02
 
 
 def test_no_face_and_mask_rules_hold(trip: own.OwnTrip) -> None:
@@ -413,7 +440,10 @@ def test_raw_frames_input_is_synced_and_validates(phone: own.PhoneData, tmp_path
     df = trip.frame
     tau = df[S.COL_T].to_numpy(np.float64)
     noface = df["v_face_visible"].to_numpy(np.float64) == 0.0
-    assert abs(_phone_time(trip, tau[noface][0]) - NOFACE_PHONE[0]) <= S.STEP_S + 1e-6
+    # a step (t - 0.1, t] is no-face only when none of its frames has a face, and it is stamped
+    # with its end, so the first such step ends up to two steps after the true onset
+    late = _phone_time(trip, tau[noface][0]) - NOFACE_PHONE[0]
+    assert -0.02 <= late <= 2 * S.STEP_S + 0.02
     assert abs(_phone_time(trip, tau[noface][-1]) - NOFACE_PHONE[1]) <= S.STEP_S + 1e-6
     assert "v_ear_mean" in trip.meta["all_nan_columns"]  # synthetic face without eye geometry
     assert trip.meta["sampling_rates"]["video_fps"] == pytest.approx(30.0, rel=1e-3)
