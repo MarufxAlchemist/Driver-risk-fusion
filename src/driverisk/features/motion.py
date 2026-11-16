@@ -57,7 +57,7 @@ class MotionConfig:
 class Alignment:
     ok: bool
     reason: str
-    up_source: str  # "stationary" | "trip_mean"
+    up_source: str  # "stationary" | "trip_mean" | "vehicle_frame"
     up_dev: np.ndarray  # [3] unit vector pointing up, in the phone frame
     g_dev: np.ndarray  # [3] gravity as the phone senses it at rest, in the phone frame
     R: np.ndarray | None  # [3, 3] rows x, y, z of the vehicle frame in the phone frame, or None
@@ -110,6 +110,24 @@ def _bin_last(t: np.ndarray, x: np.ndarray, n: int, dt: float) -> np.ndarray:
     return out
 
 
+def resample_last(
+    t: np.ndarray, x: np.ndarray, n: int, *, keep_nan: bool = False, dt: float = S.STEP_S
+) -> np.ndarray:
+    """Latest sample of `x` in each step k = (k*dt - dt, k*dt], NaN for an empty step. Causal.
+
+    By default NaN samples are skipped (the latest finite one wins); with `keep_nan=True` a NaN
+    latest sample makes the step NaN (for sources whose NaN means "lost", such as a lane detector).
+    """
+    if not keep_nan:
+        return _bin_last(t, x, n, dt)
+    idx = _bin_index(t, dt)
+    x = np.asarray(x, dtype=np.float64)
+    out = np.full(n, np.nan)
+    keep = (idx >= 0) & (idx < n)
+    out[idx[keep]] = x[keep]  # later samples overwrite earlier ones, NaN included
+    return out
+
+
 def _ffill_one(x: np.ndarray) -> np.ndarray:
     """Fill a single empty step from its predecessor (an IMU sample 0.1-0.2 s old is current)."""
     out = x.copy()
@@ -137,6 +155,21 @@ def _unit(v: np.ndarray) -> np.ndarray:
 
 
 # --- alignment ------------------------------------------------------------------------------
+def vehicle_frame_alignment(gravity_included: bool) -> Alignment:
+    """Identity alignment for sources already in the vehicle frame (x forward, y left, z up).
+
+    For datasets such as UAH-DriveSet whose accelerations are vehicle-aligned: pass this to
+    `extract_motion_features(alignment=...)` so `estimate_alignment` is not run. With
+    `gravity_included`, the z channel reads +1 g at rest and 1 g is subtracted from it.
+    """
+    up = np.array([0.0, 0.0, 1.0])
+    g_dev = up * G_STD if gravity_included else np.zeros(3)
+    return Alignment(
+        True, "vehicle-aligned source: alignment not estimated", "vehicle_frame", up, g_dev,
+        np.eye(3),
+    )  # fmt: skip
+
+
 def estimate_alignment(
     t_acc: np.ndarray,
     acc: np.ndarray,

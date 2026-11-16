@@ -1,0 +1,109 @@
+# UAH-DriveSet loader (src/driverisk/data/uah.py, P1-B1; docs/03_data_contract.md section 4.4).
+#
+# STATUS: UNVERIFIED. The dataset has NOT been downloaded. Everything below comes from the UAH
+# paper (R11, Romera et al. 2016) as recorded in docs/11_implementation_analysis.md section 3.1
+# and docs/03 section 4.4, plus column orders that the repo docs do not fix (marked per entry).
+# The loader checks every column count when it reads a file and stops with a clear error when a
+# real file differs. Run scripts/inspect_uah.py on the download first, then correct this file.
+version: 0.1-unverified
+
+# File kinds are found by name prefix (case-insensitive), the same prefixes as
+# driverisk.data.uah_inspect.FILE_PREFIXES. More than one match in a route folder is an error.
+files:
+  acc:
+    prefix: RAW_ACC
+    required: true
+    # UNVERIFIED. docs/11 section 3.1 says 11 columns; docs/human_tasks/01_datasets.md says
+    # "12 columns incl. timestamp". The two repo docs disagree; 11 is the paper's list below.
+    n_cols: 11
+    columns:          # 0-based column index
+      t: 0            # timestamp, s
+      active: 1       # UNVERIFIED: "system activated" flag (speed above 50 km/h); not used
+      ax_raw: 2       # G  (the paper: X, Y lateral, Z longitudinal)
+      ay_raw: 3
+      az_raw: 4
+      ax_kf: 5        # Kalman-filtered X/Y/Z, G (UNVERIFIED order)
+      ay_kf: 6
+      az_kf: 7
+      roll: 8         # deg
+      pitch: 9        # deg
+      yaw: 10         # deg
+  gps:
+    prefix: RAW_GPS
+    required: true
+    n_cols: 9         # docs/11 and docs/human_tasks agree on 9 columns (from the paper)
+    columns:
+      t: 0
+      speed_kmh: 1    # km/h (paper)
+      lat: 2          # UNVERIFIED order from here on
+      lon: 3
+      alt: 4
+      vert_accuracy: 5
+      horiz_accuracy: 6
+      course: 7       # deg; assumed clockwise like a compass (UNVERIFIED)
+      difcourse: 8
+  lane:
+    prefix: PROC_LANE
+    required: false   # without it lane_offset and lateral_drift_5s are NaN (and declared)
+    n_cols: 5         # UNVERIFIED count and order
+    columns:
+      t: 0
+      x_offset_m: 1   # car position relative to the lane centre, m (paper: "X")
+      phi_deg: 2
+      road_width_m: 3
+      state: 4        # detector state; only `lane_valid_state` counts as a detection
+  inertial:
+    prefix: EVENTS_INERTIAL
+    required: false   # missing file = no events, recorded in meta
+    n_cols: 6         # UNVERIFIED count and order
+    columns:
+      t: 0
+      type: 1         # 1 braking, 2 turning, 3 acceleration (paper; UNVERIFIED codes)
+      level: 2        # 1 low, 2 medium, 3 high (paper; UNVERIFIED codes)
+      lat: 3
+      lon: 4
+      date: 5
+
+# Rows that are not all-numeric are an error, except this many leading lines (headers).
+skip_header_lines: 0
+
+# Acceleration: which triple to use, unit factor, and the axis map into the contract frame
+# (x forward, y left, z up). `src` names a column key above; `sign` is +1 or -1.
+acceleration:
+  source: raw         # raw | kf (Kalman-filtered)
+  g_to_mps2: 9.80665
+  axes:
+    long: {src: z, sign: 1}   # paper: Z longitudinal. SIGN UNVERIFIED (check on a braking)
+    lat: {src: y, sign: 1}    # paper: Y lateral. SIGN UNVERIFIED (check on a known left turn)
+    vert: {src: x, sign: 1}   # UNVERIFIED: the paper names Y and Z only; X assumed vertical
+  # UNVERIFIED: whether the vertical channel contains gravity. `true` subtracts 1 G from the
+  # mapped vertical axis (so the vehicle at rest reads 0). The loader checks the result.
+  gravity_in_vertical: false
+  max_abs_g: 4.0      # any |raw value| above this means the file is not in G: loud error
+
+# Attitude angles from the file, deg. Signs UNVERIFIED; yaw must end up left-positive
+# (contract convention, assumption A20).
+attitude:
+  roll_sign: 1
+  pitch_sign: 1
+  yaw_sign: 1
+
+speed:
+  kmh_to_mps: 0.2777777777777778   # 1 / 3.6
+  max_kmh: 250.0                   # a value above this is a units error: loud error
+
+lane:
+  valid_state: 2      # paper: state 2 = lane detected (UNVERIFIED code)
+  max_abs_offset_m: 5.0   # contract range of m_lane_offset; larger values are dropped (NaN)
+
+inertial_events:
+  min_speed_kmh: 50.0     # paper: events are logged only above 50 km/h (contract 4.4)
+  duration_s: 0.0         # the file gives one time per event; offset = onset + this
+  min_level: 1            # keep levels >= this (1 keeps all); OPEN QUESTION for the guide
+  type_map:               # UAH code -> contract event type
+    1: harsh_brake
+    2: sharp_turn
+    3: harsh_accel
+
+source_version: "UAH-DriveSet (version not yet read from the download)"
+vehicle_id: unknown       # the paper says one vehicle per driver; not in the folder name
