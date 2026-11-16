@@ -40,15 +40,17 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     source = args.video if args.video else args.camera
-    t, lm, mats = FL.run_on_frames(FL.video_frames(source, args.seconds))
+    t, lm, mats, size = FL.run_on_frames(FL.video_frames(source, args.seconds))
     t = t - t[0]
-    res = V.extract_vision_features(t, lm, mats, ear_threshold=args.ear_threshold)
+    res = V.extract_vision_features(t, lm, mats, ear_threshold=args.ear_threshold, image_size=size)
     args.out.mkdir(parents=True, exist_ok=True)
     res.frame.to_parquet(args.out / "vision_features.parquet", index=False)
 
     df, p = res.frame, S.VISION_PREFIX
     fps = len(t) / max(t[-1], 1e-9)
-    print(f"frames {len(t)} over {t[-1]:.1f} s ({fps:.1f} fps), steps {len(df)}")
+    print(
+        f"frames {len(t)} over {t[-1]:.1f} s ({fps:.1f} fps), {size[0]}x{size[1]}, steps {len(df)}"
+    )
     visible, usable = df[p + "face_visible"].mean(), df[S.COL_MASK_V].mean()
     print(f"face visible {visible:.0%}, usable (mask_v) {usable:.0%}")
     for name in (
