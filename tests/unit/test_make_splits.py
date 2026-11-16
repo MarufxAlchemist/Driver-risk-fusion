@@ -199,6 +199,15 @@ def test_unknown_dataset_and_missing_columns_are_refused() -> None:
         _record({"m": _manifest("uah", 3).drop(columns=["driver_id"])})
 
 
+def test_trip_id_that_names_another_driver_is_refused() -> None:
+    # The trip id carries the date used for the chronological personalization split, and a
+    # wrong driver part would mean a mislabelled row.
+    m = _manifest("uah", 3)
+    m.loc[0, "driver_id"] = "d09"
+    with pytest.raises(SP.SplitInputError, match="trip_id"):
+        _record({"m": m})
+
+
 def test_script_reports_refusal_and_writes_nothing(tmp_path: Path) -> None:
     m = _manifest("uah", 3)
     m.loc[0, "driver_id"] = ""
@@ -311,7 +320,8 @@ def test_write_manifests_rewrites_only_the_split_column(stub_root: Path, tmp_pat
         after = pd.read_csv(d / "manifest.csv", dtype=str, keep_default_na=False)
         cols = [c for c in after.columns if c != "split"]
         pd.testing.assert_frame_equal(after[cols], before[d][cols])
-        for ds, did, split in zip(after["dataset"], after["driver_id"], after["split"], strict=True):
+        rows = zip(after["dataset"], after["driver_id"], after["split"], strict=True)
+        for ds, did, split in rows:
             assert split == record["drivers"][S.driver_key(ds, did)]["split"]
         assert validate_processed_dir(d).ok
     assert SP.verify_split_record(record, {p: pd.read_csv(p, dtype=str) for p in paths}) == []

@@ -1,0 +1,21 @@
+# Split settings for scripts/make_splits.py (P1-C2; docs/04 sections 1-2, ADR-0005, fix F16).
+#
+# STATUS: PROPOSAL. The values below follow the examples in docs/04 section 2; they are not yet
+# agreed with the guide. Once splits.json is made from real manifests it is FROZEN: a change of
+# seed or fractions after that needs a new entry in the experiment protocol.
+
+seed: 0                        # split seed; independent of the training seeds 0, 1, 2 (04 section 1.4)
+
+# Driver-level holdout split, per dataset (every trip gets a train/val/test value in the manifest).
+fractions: {train: 0.70, val: 0.15, test: 0.15}   # 04 section 2: DMD example "70 / 15 / 15 by driver"
+fractions_per_dataset: {}      # e.g. own: {train: 0.5, val: 0.25, test: 0.25}
+
+# Leave-one-driver-out folds with nested validation (F16): 1 test, 1 rotating validation driver,
+# rest training. UAH per 04 section 2 ("few drivers"). Needs at least 3 drivers per dataset.
+lodo_datasets: [uah]
+
+# Within-driver personalization split (04 section 2.2).
+personalization:
+  k_calibration: 2             # first K normal trips calibrate the baseline (04 default K = 2)
+  min_trips: 4                 # drivers with fewer trips are reported as "not enough data"
+  normal_tags: [normal]        # manifest behavior_tag values that count as normal driving
