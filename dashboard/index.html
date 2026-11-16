@@ -7,163 +7,723 @@
 <style>
   :root {
     --bg: #f6f7f9; --card: #ffffff; --text: #1b2330; --muted: #5d6877; --line: #d9dee6;
-    --accent: #2457c5; --warn: #b45309; --bad: #b42318; --ok: #1a7f4b;
+    --accent: #2457c5; --accent-text: #ffffff; --warn: #b45309; --bad: #b42318; --ok: #1a7f4b;
+    --chip: #eef1f5;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       --bg: #11151c; --card: #1a202a; --text: #e8ecf2; --muted: #a2adbb; --line: #2c3544;
-      --accent: #7aa2f7; --warn: #f0a24b; --bad: #ff7b72; --ok: #56d364;
+      --accent: #7aa2f7; --accent-text: #11151c; --warn: #f0a24b; --bad: #ff7b72; --ok: #56d364;
+      --chip: #232b37;
     }
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text);
          font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
   h1 { font-size: 1.3rem; margin: 0 0 4px; }
+  h2 { font-size: 1rem; margin: 0 0 8px; }
+  h3 { font-size: .9rem; margin: 12px 0 4px; }
   .sub { color: var(--muted); margin: 0 0 20px; font-size: .9rem; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
-          padding: 16px; margin-bottom: 16px; }
+          padding: 16px; margin-bottom: 16px; min-width: 0; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   label { font-size: .85rem; color: var(--muted); }
-  input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px;
+  input { padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit;
           background: var(--bg); color: var(--text); min-width: 0; flex: 1 1 140px; }
   button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent);
-           color: #fff; font: inherit; cursor: pointer; }
+           color: var(--accent-text); font: inherit; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--line); }
   button:disabled { opacity: .5; cursor: default; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 16px; }
+  @media (min-width: 820px) { .layout { grid-template-columns: 280px minmax(0, 1fr); } }
+  ul { list-style: none; margin: 0; padding: 0; }
+  #trips li { margin-top: 6px; }
+  #trips button { width: 100%; text-align: left; background: var(--bg); color: var(--text);
+                  border: 1px solid var(--line); }
+  #trips button[aria-current="true"] { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+  .trip-id { font-family: ui-monospace, Consolas, monospace; font-weight: 600; }
+  .muted { color: var(--muted); font-size: .85rem; }
   meter { width: 100%; height: 22px; }
+  .gauge-row { display: flex; align-items: baseline; gap: 12px; }
+  #risk-value { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .kv { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
         font-size: .9rem; color: var(--muted); margin-top: 8px; }
-  #banner { display: none; border-left: 4px solid var(--warn); padding: 8px 12px;
-            background: var(--card); margin-bottom: 16px; border-radius: 4px; }
-  #banner.show { display: block; }
-  ul { list-style: none; margin: 0; padding: 0; }
-  li.alert { border-top: 1px solid var(--line); padding: 10px 0; }
+  #banner { border-left: 4px solid var(--warn); padding: 8px 12px; background: var(--card);
+            margin-bottom: 16px; border-radius: 4px; }
+  #banner[hidden] { display: none; }
+  li.alert { border-top: 1px solid var(--line); padding: 12px 0 12px 12px; border-left: 4px solid var(--line); }
   li.alert:first-child { border-top: 0; }
-  .sev-high { color: var(--bad); font-weight: 600; }
-  .sev-medium { color: var(--warn); font-weight: 600; }
-  .sev-info { color: var(--ok); font-weight: 600; }
-  .muted { color: var(--muted); font-size: .85rem; }
-  .sr { position: absolute; left: -9999px; }
+  li.alert.sev-high { border-left: 8px solid var(--bad); }
+  li.alert.sev-medium { border-left: 6px double var(--warn); }
+  li.alert.sev-info { border-left: 4px dotted var(--ok); }
+  .badge { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: .8rem;
+           font-weight: 700; border: 1px solid currentColor; margin-right: 6px; }
+  .badge.sev-high { color: var(--bad); }
+  .badge.sev-medium { color: var(--warn); }
+  .badge.sev-info { color: var(--ok); }
+  .chip { display: inline-block; padding: 0 8px; border-radius: 999px; font-size: .8rem;
+          background: var(--chip); margin: 2px 4px 2px 0; }
+  .alert-title { font-weight: 600; }
+  .alert p { margin: 4px 0; }
+  details { margin-top: 6px; }
+  summary { cursor: pointer; color: var(--accent); font-size: .9rem; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; margin-top: 4px; }
+  th, td { text-align: left; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line);
+           white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .weights { display: grid; grid-template-columns: auto minmax(60px, 1fr) auto; gap: 2px 8px;
+             align-items: center; font-size: .85rem; margin-top: 4px; }
+  .weights meter { height: 14px; }
+  dl.facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 12px; margin: 0;
+             font-size: .9rem; }
+  dl.facts dt { color: var(--muted); }
+  dl.facts dd { margin: 0; }
 </style>
 </head>
 <body>
 <main>
   <h1>Driver Risk Monitor</h1>
-  <p class="sub">Dashboard shell (P0). Shows the mock server's scripted sequence. No real model output.</p>
+  <p class="sub">Dashboard (P1-D3). Shows the mock server's scripted sequence; nothing here comes from a real model.</p>
 
-  <section class="card" aria-label="Connection">
-    <div class="row">
+  <section class="card" aria-labelledby="conn-h">
+    <h2 id="conn-h">Connection</h2>
+    <form id="key-form" class="row" autocomplete="off">
       <label for="key">API key</label>
-      <input id="key" value="dev-token" autocomplete="off">
-      <button id="start">Start demo trip</button>
-    </div>
+      <input id="key" name="key" type="password" spellcheck="false" aria-describedby="key-note">
+      <button id="save-key" type="submit">Use key</button>
+    </form>
+    <p id="key-note" class="muted">Kept in this tab's session storage only. The mock server's default key is <code>dev-token</code>.</p>
     <p id="state" class="muted" role="status">Not connected.</p>
   </section>
 
-  <div id="banner" role="alert"></div>
+  <div class="layout">
+    <section class="card" aria-labelledby="trips-h">
+      <h2 id="trips-h">Trips</h2>
+      <div class="row">
+        <button id="start" type="button">Start demo trip</button>
+        <button id="refresh" type="button" class="secondary">Refresh</button>
+      </div>
+      <ul id="trips" aria-label="Trip list"></ul>
+      <p id="trips-empty" class="muted">No trips loaded yet.</p>
+    </section>
 
-  <section class="card" aria-label="Current risk">
-    <label for="gauge">Risk score</label>
-    <meter id="gauge" min="0" max="1" low="0.4" high="0.7" optimum="0" value="0"></meter>
-    <div class="kv">
-      <span>t = <b id="t">0.0</b> s</span>
-      <span>Calibration: <b id="calib">-</b></span>
-      <span>Sources: <b id="mods">-</b></span>
+    <div id="trip-view" hidden>
+      <section class="card" aria-labelledby="trip-title">
+        <h2 id="trip-title" tabindex="-1">Trip</h2>
+        <p id="trip-meta" class="muted"></p>
+        <p id="conn" class="muted" role="status"></p>
+        <div class="row">
+          <button id="reconnect" type="button" class="secondary" hidden>Reconnect live stream</button>
+        </div>
+      </section>
+
+      <div id="banner" role="status" aria-live="polite" hidden></div>
+
+      <section class="card" aria-labelledby="live-h">
+        <h2 id="live-h">Live risk</h2>
+        <label for="gauge">Risk score (0 to 1)</label>
+        <div class="gauge-row">
+          <output id="risk-value" for="gauge">-</output>
+          <span id="risk-band" class="muted">waiting for status</span>
+        </div>
+        <meter id="gauge" min="0" max="1" low="0.4" high="0.7" optimum="0" value="0"></meter>
+        <div class="kv">
+          <span>t = <b id="t">-</b> s</span>
+          <span>Calibration: <b id="calib">-</b></span>
+          <span>Modalities in use: <b id="mods">-</b></span>
+        </div>
+        <p id="stale" class="muted" hidden></p>
+        <p class="muted">Bands (below 0.4, 0.4 to 0.7, above 0.7) are for display only; alert thresholds are decided in P4.</p>
+      </section>
+
+      <section class="card" aria-labelledby="alerts-h">
+        <h2 id="alerts-h">Alerts</h2>
+        <ul id="alerts" aria-live="polite" aria-relevant="additions"></ul>
+        <p id="alerts-empty" class="muted">No alerts yet.</p>
+      </section>
+
+      <section class="card" aria-labelledby="summary-h">
+        <h2 id="summary-h">Trip summary</h2>
+        <div class="row">
+          <button id="load-summary" type="button" class="secondary">Load summary</button>
+        </div>
+        <div id="summary" aria-live="polite">
+          <p class="muted">Loaded automatically when the trip ends.</p>
+        </div>
+      </section>
     </div>
-  </section>
-
-  <section class="card" aria-label="Alert feed">
-    <h2 style="font-size:1rem;margin:0 0 8px">Alerts</h2>
-    <ul id="alerts"><li class="muted" id="none">No alerts yet.</li></ul>
-  </section>
+  </div>
 </main>
 
 <script>
 (function () {
   "use strict";
+  // Security: every piece of server text goes in through textContent / createElement; never as
+  // markup. Tolerance: messages may be missing, reordered or of an unknown type (05 section 3.6).
+
   var $ = function (id) { return document.getElementById(id); };
-  var ws = null;
+  var KEY_STORE = "driverisk.apiKey";
+  var DEFAULT_KEY = "dev-token";  // mock server default; demo only
+  var DEMO_DRIVER = "drv_demo";
+  var STALE_MS = 5000;            // status is 1 Hz; warn after 5 s of silence
 
+  // Alert taxonomy (ADR-0007): event alerts vs state alerts. Unknown types are shown raw.
+  var TYPE_LABELS = {
+    "harsh_accel": "Harsh acceleration",
+    "harsh_brake": "Harsh braking",
+    "sharp_turn": "Sharp turn",
+    "lane_weave": "Lane weaving",
+    "micro_sleep": "Micro-sleep",
+    "distraction_episode": "Distraction episode",
+    "aggressive": "Aggressive driving",
+    "drowsy": "Drowsy",
+    "distracted": "Distracted"
+  };
+  var STATE_TYPES = ["aggressive", "drowsy", "distracted"];
+  var SEVERITIES = ["info", "medium", "high"];
+  var MODALITY_LABELS = { "camera": "Camera", "motion": "Motion" };
+
+  // ---- small helpers ----------------------------------------------------------------------
+  function loadKey() {
+    try { return window.sessionStorage.getItem(KEY_STORE); } catch (e) { return null; }
+  }
+  function saveKey(value) {
+    try { window.sessionStorage.setItem(KEY_STORE, value); } catch (e) { /* storage blocked */ }
+  }
+  function apiKey() { return $("key").value; }
+
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) { node.className = cls; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+  function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
+  function isNum(x) { return typeof x === "number" && isFinite(x); }
+  function fmt(x, digits) { return isNum(x) ? x.toFixed(digits) : "-"; }
+  function signed(x, digits) { return isNum(x) ? (x > 0 ? "+" : "") + x.toFixed(digits) : "-"; }
+  function pct(x) { return isNum(x) ? Math.round(x * 100) + "%" : "-"; }
+  function str(x, fallback) { return typeof x === "string" && x ? x : fallback; }
+  function typeLabel(t) { return TYPE_LABELS[t] || str(t, "unknown type"); }
+  function modLabel(m) { return MODALITY_LABELS[m] || str(m, "unknown"); }
+  function modList(arr) {
+    return Array.isArray(arr) && arr.length ? arr.map(modLabel).join(" + ") : "-";
+  }
+  function when(iso) {
+    var d = new Date(iso);
+    return typeof iso === "string" && !isNaN(d.getTime()) ? d.toLocaleString() : str(iso, "-");
+  }
   function setState(text) { $("state").textContent = text; }
+  function setConn(text) { $("conn").textContent = text; }
 
-  function showBanner(text) {
-    var b = $("banner");
-    b.textContent = text;
-    b.classList.toggle("show", Boolean(text));
+  async function api(path, options) {
+    var opts = options || {};
+    var headers = { "X-API-Key": apiKey() };
+    if (opts.body !== undefined) { headers["Content-Type"] = "application/json"; }
+    var res = await fetch(path, {
+      method: opts.method || "GET",
+      headers: headers,
+      body: opts.body === undefined ? undefined : JSON.stringify(opts.body)
+    });
+    var data = null;
+    try { data = await res.json(); } catch (e) { data = null; }
+    if (!res.ok) {
+      var err = data && data.error ? data.error : null;
+      throw new Error("HTTP " + res.status + (err ? " " + str(err.code, "") + ": " + str(err.message, "") : ""));
+    }
+    return data;
   }
+  function tripPath(id) { return "/v1/trips/" + encodeURIComponent(id); }
 
-  function addAlert(a) {
-    var none = $("none");
-    if (none) { none.remove(); }
-    var li = document.createElement("li");
-    li.className = "alert";
-    var head = document.createElement("div");
-    var sev = document.createElement("span");
-    sev.className = "sev-" + a.severity;
-    sev.textContent = a.severity.toUpperCase();
-    head.appendChild(sev);
-    head.appendChild(document.createTextNode(
-      " " + a.type + " (" + a.kind + (a.horizon_s ? ", " + a.horizon_s + " s ahead" : "") + ")"));
-    var why = document.createElement("div");
-    why.textContent = a.reason.summary;
-    var meta = document.createElement("div");
-    meta.className = "muted";
-    meta.textContent = "risk " + a.risk_score.toFixed(2) + " | confidence " +
-      a.confidence.toFixed(2) + " | t = " + a.t.toFixed(1) + " s" +
-      (a.personalized ? " | personalized" : "");
-    li.appendChild(head); li.appendChild(why); li.appendChild(meta);
-    $("alerts").prepend(li);
-  }
+  // ---- trip list (GET /v1/trips) ----------------------------------------------------------
+  var trips = [];
 
-  // The dashboard must tolerate missing or reordered messages (05 section 3.6).
-  function handle(msg) {
-    switch (msg.type) {
-      case "status":
-        $("gauge").value = msg.risk_score;
-        $("t").textContent = msg.t.toFixed(1);
-        $("calib").textContent = msg.calibration;
-        $("mods").textContent = msg.modalities_used.join(" + ");
-        break;
-      case "alert": addAlert(msg.alert); break;
-      case "degraded": showBanner(msg.modality + " unavailable (" + msg.reason + ")"); break;
-      case "recovered": showBanner(""); break;
-      case "trip_ended": setState("Trip ended."); break;
-      default: break;
+  async function refreshTrips() {
+    try {
+      var list = await api("/v1/trips");
+      trips = Array.isArray(list) ? list.slice() : [];
+      trips.sort(function (a, b) { return String(b.started_at).localeCompare(String(a.started_at)); });
+      renderTrips();
+      setState("Connected. " + trips.length + " trip(s).");
+    } catch (e) {
+      setState("Could not load trips: " + e.message);
     }
   }
 
-  $("start").addEventListener("click", async function () {
-    var key = $("key").value;
+  function renderTrips() {
+    var ul = $("trips");
+    clear(ul);
+    $("trips-empty").hidden = trips.length > 0;
+    $("trips-empty").textContent = "No trips yet. Press \"Start demo trip\".";
+    trips.forEach(function (trip) {
+      if (!trip || typeof trip.trip_id !== "string") { return; }
+      var li = el("li");
+      var b = el("button");
+      b.type = "button";
+      b.setAttribute("aria-current", cur && cur.id === trip.trip_id ? "true" : "false");
+      b.appendChild(el("span", "trip-id", trip.trip_id));
+      b.appendChild(el("br"));
+      var dev = trip.device && trip.device.type ? " | " + trip.device.type : "";
+      b.appendChild(el("span", "muted",
+        (trip.ended_at ? "ended" : "open") + " | " + when(trip.started_at) + dev));
+      b.addEventListener("click", function () { openTrip(trip); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  async function startDemoTrip() {
     $("start").disabled = true;
-    $("alerts").textContent = "";
-    showBanner("");
     try {
-      var res = await fetch("/v1/trips", {
+      var started = await api("/v1/trips", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-API-Key": key },
-        body: JSON.stringify({
-          driver_id: "drv_demo",
+        body: {
+          driver_id: DEMO_DRIVER,
           device: { type: "browser", model: "dashboard", mount: "none" },
           contract_version: "0.1",
           sensors: { camera: true, imu: true, gps: false }
-        })
+        }
       });
-      if (!res.ok) { throw new Error("start failed: HTTP " + res.status); }
-      var trip = await res.json();
-      var proto = location.protocol === "https:" ? "wss:" : "ws:";
-      ws = new WebSocket(proto + "//" + location.host + trip.stream_url +
-                         "?token=" + encodeURIComponent(key));
-      ws.onopen = function () { setState("Connected to " + trip.trip_id); };
-      ws.onmessage = function (e) {
-        try { handle(JSON.parse(e.data)); } catch (err) { /* ignore malformed message */ }
-      };
-      ws.onclose = function () { $("start").disabled = false; };
-      ws.onerror = function () { setState("WebSocket error."); };
-    } catch (err) {
-      setState(String(err.message || err));
+      await refreshTrips();
+      var info = trips.filter(function (t) { return t.trip_id === started.trip_id; })[0];
+      openTrip(info || { trip_id: started.trip_id, driver_id: DEMO_DRIVER, ended_at: null });
+    } catch (e) {
+      setState("Could not start a trip: " + e.message);
+    } finally {
       $("start").disabled = false;
     }
+  }
+
+  // ---- per-trip view ----------------------------------------------------------------------
+  var cur = null;   // state of the open trip view
+  var gen = 0;      // bumps on every trip switch so late messages from an old socket are dropped
+
+  function newTripState(trip) {
+    return {
+      id: trip.trip_id, info: trip, gen: ++gen, ws: null, ended: false, unknown: 0,
+      lastStatusT: null, lastStatusAt: 0,
+      degraded: {},     // modality -> { t, reason }
+      recoveredT: {},   // modality -> latest recovered t (guards against a late degraded)
+      alerts: {}        // alert_id -> alert
+    };
+  }
+
+  function openTrip(trip) {
+    closeSocket();
+    cur = newTripState(trip);
+    renderTrips();
+    $("trip-view").hidden = false;
+    $("trip-title").textContent = "Trip " + trip.trip_id;
+    var meta = [];
+    if (trip.driver_id) { meta.push("driver " + trip.driver_id); }
+    if (trip.started_at) { meta.push("started " + when(trip.started_at)); }
+    meta.push(trip.ended_at ? "ended " + when(trip.ended_at) : "open");
+    $("trip-meta").textContent = meta.join(" | ");
+    resetLive();
+    renderAlerts();
+    renderBanner();
+    clear($("summary"));
+    $("summary").appendChild(el("p", "muted", "Loaded automatically when the trip ends."));
+    $("trip-title").focus();
+    if (trip.ended_at) {
+      cur.ended = true;
+      setConn("This trip has ended; showing stored alerts and the summary.");
+      loadAlerts(cur.gen);
+      loadSummary(cur.gen);
+    } else {
+      connect();
+    }
+  }
+
+  function resetLive() {
+    $("gauge").value = 0;
+    $("risk-value").textContent = "-";
+    $("risk-band").textContent = "waiting for status";
+    $("t").textContent = "-";
+    $("calib").textContent = "-";
+    $("mods").textContent = "-";
+    $("stale").hidden = true;
+  }
+
+  function closeSocket() {
+    if (cur && cur.ws) {
+      var old = cur.ws;
+      cur.ws = null;
+      try { old.close(); } catch (e) { /* already closed */ }
+    }
+  }
+
+  function connect() {
+    if (!cur) { return; }
+    closeSocket();
+    cur.gen = ++gen;  // the closed socket's late events are now ignored
+    var myGen = cur.gen;
+    var proto = location.protocol === "https:" ? "wss:" : "ws:";
+    // Browsers cannot set headers on a WebSocket, so the key goes in ?token= (05 section 1).
+    var url = proto + "//" + location.host + tripPath(cur.id) + "/stream?token=" +
+              encodeURIComponent(apiKey());
+    var ws;
+    try { ws = new WebSocket(url); } catch (e) { setConn("Could not open the stream: " + e.message); return; }
+    cur.ws = ws;
+    cur.ended = false;
+    $("reconnect").hidden = true;
+    setConn("Connecting to the live stream...");
+    ws.onopen = function () { if (myGen === gen) { setConn("Live: receiving messages."); } };
+    ws.onmessage = function (e) {
+      var msg;
+      try { msg = JSON.parse(e.data); } catch (err) { return; }  // ignore malformed message
+      handle(msg, myGen);
+    };
+    ws.onerror = function () { if (myGen === gen) { setConn("Stream error."); } };
+    ws.onclose = function (e) {
+      if (myGen !== gen) { return; }
+      if (cur.ws === ws) { cur.ws = null; }
+      $("stale").hidden = true;
+      var note = cur.unknown ? " Ignored " + cur.unknown + " message(s) of unknown type." : "";
+      if (e.code === 1008) {
+        setConn("Stream rejected (code 1008): wrong API key or unknown trip.");
+      } else if (cur.ended) {
+        setConn("Trip ended; the server closed the stream." + note);
+      } else {
+        setConn("Stream closed before trip_ended (code " + e.code + "). " +
+                "You can reconnect or load the summary." + note);
+      }
+      $("reconnect").hidden = false;
+    };
+  }
+
+  // ---- WebSocket messages (05 section 3.6) ------------------------------------------------
+  function handle(msg, myGen) {
+    if (!cur || myGen !== gen || !msg || typeof msg !== "object") { return; }
+    switch (msg.type) {
+      case "status": onStatus(msg); break;
+      case "alert": if (msg.alert && typeof msg.alert === "object") { addAlert(msg.alert); } break;
+      case "degraded": onDegraded(msg); break;
+      case "recovered": onRecovered(msg); break;
+      case "trip_ended": onTripEnded(msg); break;
+      default:
+        cur.unknown += 1;  // unknown message types are ignored
+        break;
+    }
+  }
+
+  function onStatus(msg) {
+    if (!isNum(msg.t) || !isNum(msg.risk_score)) { return; }
+    // Reordered: an older status must not overwrite a newer one.
+    if (cur.lastStatusT !== null && msg.t < cur.lastStatusT) { return; }
+    cur.lastStatusT = msg.t;
+    cur.lastStatusAt = Date.now();
+    var risk = Math.min(1, Math.max(0, msg.risk_score));
+    $("gauge").value = risk;
+    $("risk-value").textContent = risk.toFixed(2);
+    $("risk-band").textContent = risk >= 0.7 ? "high band" : risk >= 0.4 ? "elevated band" : "low band";
+    $("t").textContent = msg.t.toFixed(1);
+    var calib = str(msg.calibration, "-");
+    $("calib").textContent = calib === "calibrating" ? "calibrating (global thresholds)" :
+                             calib === "ready" ? "ready (personalized)" : calib;
+    $("mods").textContent = modList(msg.modalities_used);
+    $("stale").hidden = true;
+  }
+
+  function onDegraded(msg) {
+    var m = str(msg.modality, "unknown");
+    var t = isNum(msg.t) ? msg.t : null;
+    var rec = cur.recoveredT[m];
+    if (rec !== undefined && t !== null && t <= rec) { return; }  // late copy of an old episode
+    cur.degraded[m] = { t: t, reason: str(msg.reason, "no reason given") };
+    renderBanner();
+  }
+
+  function onRecovered(msg) {
+    var m = str(msg.modality, "unknown");
+    var t = isNum(msg.t) ? msg.t : null;
+    var d = cur.degraded[m];
+    if (d && (t === null || d.t === null || t >= d.t)) { delete cur.degraded[m]; }
+    if (t !== null && (cur.recoveredT[m] === undefined || t > cur.recoveredT[m])) {
+      cur.recoveredT[m] = t;
+    }
+    renderBanner();
+  }
+
+  function onTripEnded(msg) {
+    if (msg.trip_id && msg.trip_id !== cur.id) { return; }
+    cur.ended = true;
+    setConn("Trip ended. Loading the summary...");
+    loadSummary(cur.gen);
+    refreshTrips();
+  }
+
+  function renderBanner() {
+    var b = $("banner");
+    var mods = cur ? Object.keys(cur.degraded) : [];
+    if (!mods.length) { b.hidden = true; b.textContent = ""; return; }
+    var parts = mods.map(function (m) {
+      var d = cur.degraded[m];
+      return modLabel(m) + " unavailable (" + d.reason + ")" + (d.t !== null ? " since t = " + d.t.toFixed(1) + " s" : "");
+    });
+    var others = ["camera", "motion"].filter(function (m) { return mods.indexOf(m) < 0; });
+    var tail = others.length === 2 ? "" : others.length === 1 ?
+      " Degraded mode: using " + modLabel(others[0]).toLowerCase() + " only." :
+      " Degraded mode: no sources, no alerts.";
+    b.textContent = "Warning: " + parts.join("; ") + "." + tail;
+    b.hidden = false;
+  }
+
+  setInterval(function () {
+    if (!cur || !cur.ws || cur.ended || !cur.lastStatusAt) { return; }
+    var silent = Date.now() - cur.lastStatusAt;
+    if (silent > STALE_MS) {
+      $("stale").textContent = "No status message for " + Math.round(silent / 1000) +
+        " s; the values above may be out of date.";
+      $("stale").hidden = false;
+    }
+  }, 1000);
+
+  // ---- alert feed (05 section 3.4) --------------------------------------------------------
+  function addAlert(a) {
+    var id = str(a.alert_id, "alert-" + Object.keys(cur.alerts).length);
+    cur.alerts[id] = a;  // dedupe by alert_id (stream + stored list)
+    renderAlerts();
+  }
+
+  function renderAlerts() {
+    var ul = $("alerts");
+    clear(ul);
+    var list = cur ? Object.keys(cur.alerts).map(function (k) { return cur.alerts[k]; }) : [];
+    list.sort(function (x, y) { return (isNum(y.t) ? y.t : -1) - (isNum(x.t) ? x.t : -1); });  // newest first
+    $("alerts-empty").hidden = list.length > 0;
+    list.forEach(function (a) { ul.appendChild(alertItem(a)); });
+  }
+
+  function alertItem(a) {
+    var sev = SEVERITIES.indexOf(a.severity) >= 0 ? a.severity : "unknown";
+    var li = el("li", "alert sev-" + sev);
+    var reason = a.reason && typeof a.reason === "object" ? a.reason : {};
+
+    var head = el("p");
+    head.appendChild(el("span", "badge sev-" + sev, sev.toUpperCase()));
+    head.appendChild(el("span", "alert-title", typeLabel(a.type)));
+    li.appendChild(head);
+
+    var tags = el("p");
+    var isState = STATE_TYPES.indexOf(a.type) >= 0;
+    tags.appendChild(el("span", "chip", isState ? "state alert" : "event alert"));
+    if (a.kind === "predictive") {
+      tags.appendChild(el("span", "chip",
+        "predictive: risk in the next " + (isNum(a.horizon_s) ? a.horizon_s : "?") + " s"));
+    } else if (a.kind === "detected") {
+      tags.appendChild(el("span", "chip", "detected: happening now"));
+    } else {
+      tags.appendChild(el("span", "chip", "kind: " + str(a.kind, "unknown")));
+    }
+    tags.appendChild(el("span", "chip", a.personalized ? "personalized baseline" : "global baseline"));
+    if (a.degraded) { tags.appendChild(el("span", "chip", "degraded window")); }
+    li.appendChild(tags);
+
+    li.appendChild(el("p", null, str(reason.summary, "(no reason given)")));
+    li.appendChild(el("p", "muted",
+      "risk " + fmt(a.risk_score, 2) + " | confidence " + fmt(a.confidence, 2) +
+      " | t = " + fmt(a.t, 1) + " s | sources " + modList(a.modalities_used) +
+      (a.ts ? " | " + when(a.ts) : "")));
+
+    var ev = Array.isArray(reason.evidence) ? reason.evidence : [];
+    var weights = reason.modality_weights && typeof reason.modality_weights === "object" ? reason.modality_weights : null;
+    if (ev.length || weights) {
+      var det = el("details");
+      det.appendChild(el("summary", null, "Why: evidence and modality weights"));
+      if (ev.length) { det.appendChild(evidenceTable(ev)); }
+      if (weights) { det.appendChild(weightList(weights)); }
+      li.appendChild(det);
+    }
+    return li;
+  }
+
+  function evidenceTable(ev) {
+    var wrap = el("div", "table-wrap");
+    var table = el("table");
+    table.appendChild(el("caption", "muted", "Evidence: deviation from the driver's usual values"));
+    var thead = el("thead");
+    var hr = el("tr");
+    [["Feature", ""], ["Value", "num"], ["Usual mean", "num"], ["Usual std", "num"], ["z", "num"], ["Modality", ""]]
+      .forEach(function (h) {
+        var th = el("th", h[1] || null, h[0]);
+        th.scope = "col";
+        hr.appendChild(th);
+      });
+    thead.appendChild(hr);
+    table.appendChild(thead);
+    var tbody = el("tbody");
+    ev.forEach(function (e) {
+      if (!e || typeof e !== "object") { return; }
+      var tr = el("tr");
+      var th = el("th", null, str(e.feature, "?"));
+      th.scope = "row";
+      tr.appendChild(th);
+      tr.appendChild(el("td", "num", fmt(e.value, 2)));
+      tr.appendChild(el("td", "num", fmt(e.baseline_mean, 2)));
+      tr.appendChild(el("td", "num", fmt(e.baseline_std, 2)));
+      tr.appendChild(el("td", "num", signed(e.z, 1)));
+      tr.appendChild(el("td", null, modLabel(e.modality)));
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  function weightList(weights) {
+    var box = el("div");
+    box.appendChild(el("h3", null, "Modality weights"));
+    var grid = el("div", "weights");
+    Object.keys(weights).forEach(function (m) {
+      var w = weights[m];
+      if (!isNum(w)) { return; }
+      var id = "w-" + Math.random().toString(36).slice(2);
+      var lab = el("label", null, modLabel(m));
+      lab.htmlFor = id;
+      var meter = el("meter");
+      meter.id = id;
+      meter.min = 0; meter.max = 1;
+      meter.value = Math.min(1, Math.max(0, w));
+      grid.appendChild(lab);
+      grid.appendChild(meter);
+      grid.appendChild(el("span", null, pct(w)));
+    });
+    box.appendChild(grid);
+    return box;
+  }
+
+  async function loadAlerts(myGen) {
+    try {
+      var list = await api(tripPath(cur.id) + "/alerts");
+      if (myGen !== gen) { return; }
+      (Array.isArray(list) ? list : []).forEach(function (a) { if (a && typeof a === "object") { addAlert(a); } });
+    } catch (e) {
+      if (myGen === gen) { setConn("Could not load alerts: " + e.message); }
+    }
+  }
+
+  // ---- trip summary (GET /v1/trips/{id}/summary, 05 section 3.7) --------------------------
+  async function loadSummary(myGen) {
+    var box = $("summary");
+    try {
+      var s = await api(tripPath(cur.id) + "/summary");
+      if (myGen !== gen) { return; }
+      renderSummary(s || {});
+      if (cur.ended && !cur.ws) { setConn("Trip ended. Summary loaded."); }
+    } catch (e) {
+      if (myGen !== gen) { return; }
+      clear(box);
+      box.appendChild(el("p", null, "Could not load the summary: " + e.message));
+    }
+  }
+
+  function fact(dl, name, value) {
+    dl.appendChild(el("dt", null, name));
+    dl.appendChild(el("dd", null, value));
+  }
+
+  function renderSummary(s) {
+    var box = $("summary");
+    clear(box);
+    var dl = el("dl", "facts");
+    fact(dl, "Duration", isNum(s.duration_s) ? Math.floor(s.duration_s / 60) + " min " + Math.round(s.duration_s % 60) + " s" : "-");
+    fact(dl, "Mean risk", fmt(s.mean_risk, 2));
+    fact(dl, "Max risk", fmt(s.max_risk, 2));
+    var df = s.degraded_fraction && typeof s.degraded_fraction === "object" ? s.degraded_fraction : {};
+    fact(dl, "Time degraded", Object.keys(df).length ?
+      Object.keys(df).map(function (m) { return modLabel(m) + " " + pct(df[m]); }).join(", ") : "-");
+    fact(dl, "Route", Array.isArray(s.route) ? s.route.length + " GPS points" : "not stored (no GPS consent)");
+    box.appendChild(dl);
+
+    // Alerts by type
+    box.appendChild(el("h3", null, "Alerts by type"));
+    var abt = s.alerts_by_type && typeof s.alerts_by_type === "object" ? s.alerts_by_type : {};
+    var types = Object.keys(abt);
+    if (!types.length) {
+      box.appendChild(el("p", "muted", "No alerts."));
+    } else {
+      box.appendChild(simpleTable(["Type", "Kind of alert", "Count"], types.map(function (t) {
+        return [typeLabel(t), STATE_TYPES.indexOf(t) >= 0 ? "state" : "event", String(abt[t])];
+      }), "Alerts by type", [false, false, true]));
+    }
+
+    // Risky segments
+    box.appendChild(el("h3", null, "Risky segments"));
+    var segs = Array.isArray(s.risky_segments) ? s.risky_segments : [];
+    if (!segs.length) {
+      box.appendChild(el("p", "muted", "None."));
+    } else {
+      box.appendChild(simpleTable(["From (s)", "To (s)", "Peak risk", "Types"], segs.map(function (g) {
+        return [fmt(g.t_start, 1), fmt(g.t_end, 1), fmt(g.peak_risk, 2),
+                Array.isArray(g.types) ? g.types.map(typeLabel).join(", ") : "-"];
+      }), "Risky segments", [true, true, true, false]));
+    }
+
+    // Baseline comparison: global vs personalized
+    box.appendChild(el("h3", null, "Baseline comparison"));
+    var bc = s.baseline_comparison && typeof s.baseline_comparison === "object" ? s.baseline_comparison : null;
+    if (!bc) {
+      box.appendChild(el("p", "muted", "Not available."));
+    } else {
+      var g = bc.alerts_if_global, p = bc.alerts_personalized;
+      box.appendChild(simpleTable(["Thresholds", "Alerts"], [
+        ["Global (same for every driver)", isNum(g) ? String(g) : "-"],
+        ["Personalized (this driver's baseline)", isNum(p) ? String(p) : "-"]
+      ], "Alerts with global vs personalized thresholds", [false, true]));
+      var note = bc.personalized ? "This trip used the personalized baseline." :
+                                   "The baseline was not ready; this trip used global thresholds.";
+      if (isNum(g) && isNum(p) && g !== p) {
+        note += " Personalization " + (p < g ? "removed " + (g - p) : "added " + (p - g)) + " alert(s).";
+      }
+      box.appendChild(el("p", "muted", note));
+    }
+  }
+
+  function simpleTable(headers, rows, caption, numeric) {
+    var wrap = el("div", "table-wrap");
+    var table = el("table");
+    table.appendChild(el("caption", "muted", caption));
+    var tr = el("tr");
+    headers.forEach(function (h, i) {
+      var th = el("th", numeric[i] ? "num" : null, h);
+      th.scope = "col";
+      tr.appendChild(th);
+    });
+    var thead = el("thead");
+    thead.appendChild(tr);
+    table.appendChild(thead);
+    var tbody = el("tbody");
+    rows.forEach(function (r) {
+      var row = el("tr");
+      r.forEach(function (cell, i) { row.appendChild(el("td", numeric[i] ? "num" : null, cell)); });
+      tbody.appendChild(row);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    return wrap;
+  }
+
+  // ---- wiring -----------------------------------------------------------------------------
+  $("key").value = loadKey() || DEFAULT_KEY;
+  $("key-form").addEventListener("submit", function (e) {
+    e.preventDefault();
+    saveKey(apiKey());
+    refreshTrips();
   });
+  $("start").addEventListener("click", function () { saveKey(apiKey()); startDemoTrip(); });
+  $("refresh").addEventListener("click", refreshTrips);
+  $("reconnect").addEventListener("click", function () {
+    if (!cur) { return; }
+    cur.alerts = {}; cur.degraded = {}; cur.recoveredT = {}; cur.lastStatusT = null;
+    resetLive(); renderAlerts(); renderBanner();
+    connect();
+  });
+  $("load-summary").addEventListener("click", function () { if (cur) { loadSummary(cur.gen); } });
+  refreshTrips();
 })();
 </script>
 </body>
