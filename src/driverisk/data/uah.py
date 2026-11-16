@@ -239,11 +239,14 @@ def _vehicle_acceleration(acc: dict[str, np.ndarray], cfg: dict[str, Any], name:
     return veh, gravity
 
 
-def _clean_course(course: np.ndarray) -> tuple[np.ndarray, int]:
-    """Course outside [0, 360] (iOS reports -1 when unknown) is held from the last valid one."""
+def _clean_course(course: np.ndarray) -> tuple[np.ndarray | None, int]:
+    """Course outside [0, 360] (iOS reports -1 when unknown) is held from the last valid one.
+
+    None when no course is valid (heading_rate is then NaN, never a made-up 0).
+    """
     bad = ~((course >= 0) & (course <= 360))
     if bad.all():
-        return np.zeros_like(course), int(bad.sum())
+        return None, int(bad.sum())
     s = pd.Series(np.where(bad, np.nan, course)).ffill()
     return s.fillna(s.dropna().iloc[0]).to_numpy(), int(bad.sum())
 

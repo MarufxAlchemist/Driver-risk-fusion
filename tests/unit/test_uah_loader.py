@@ -358,6 +358,17 @@ def test_unknown_event_type_code_fails_loudly(tmp_path: Path, cfg, label_map) ->
         U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
 
 
+def test_invalid_course_gives_nan_heading_rate(tmp_path: Path, cfg, label_map) -> None:
+    folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    tab = np.loadtxt(folder / "RAW_GPS.txt")
+    tab[:, 7] = -1.0  # no valid course anywhere
+    _save(folder / "RAW_GPS.txt", tab)
+    trip = U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
+    assert trip.frame["m_heading_rate"].isna().all()
+    assert "m_heading_rate" in trip.meta[S.META_ALL_NAN_KEY]
+    assert trip.meta["conversion"]["gps_course_invalid_held"] == len(tab)
+
+
 def test_missing_lane_file_gives_declared_nan_lane_columns(tmp_path, cfg, label_map) -> None:
     folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
     (folder / "PROC_LANE_DETECTION.txt").unlink()
