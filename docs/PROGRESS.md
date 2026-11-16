@@ -149,7 +149,47 @@ A10 and A11 were approved and `05` was edited to match; `contract_version` stays
 7. **Agree the event thresholds** in `configs/events.yaml` with the guide (they are my proposals, see below).
 
 ## Next (P1, remaining)
-Vision features are done in code (see the 2026-11-16 log below) but **not yet checked on a real face**. Remaining: the loaders UAH (P1-B1), DMD (P1-A3), splits script (P1-C2) and label maps (P1-C1), which wait for the downloads (H1). The own-data pipeline (P1-D1) waits for the phone-app test (H4).
+All P1 tasks now exist in code (see the 2026-11-16 logs below), all tested on synthetic data only. What is left is data, not code: the UAH and DMD downloads (H1), the phone-app test (H4) and the first pilot trips (H6); then the integration run on real files and the P1 gate review.
+
+---
+
+## P1 work log (2026-11-16, later): four parallel agents, preview window, mock fixes
+
+Phase: **P1 Data and features**. Four sub-agents each worked test-first in their own git worktree and branch. I reviewed every diff (purely additive apart from one comment line in `motion.py`), merged with `--no-ff`, and ran lint plus the full suite on the combination. Tests: **384 passed** (222 before the agents), lint clean. **Nothing here has touched real data**: UAH and DMD are not downloaded and no real recording exists.
+
+| Task | Branch | State | Notes |
+|---|---|---|---|
+| Live preview for `make webcam` | `feat/a-webcam-preview` | done, **window never opened by me** | mirrored view, landmarks, live EAR open/closed, head angles, gaze, blink count, `q`/Esc; `--no-preview` for headless |
+| P1-D3 dashboard | `feat/d-dashboard` | done, **never opened in a browser** | trip list, gauge, alert feed with evidence, degraded banner, trip summary; 58 static tests; the agent ran its script under Node with a fake DOM |
+| Mock consistency | `fix/d-mock-consistency` | done | trip gets `ended_at` after its stream; `drv_demo` is ready (600/600) like the stream says |
+| P1-C2 splits | `feat/c-splits-labelmaps` | done, stub data only | `scripts/make_splits.py` writes a frozen `splits.json` (holdout, nested leave-one-driver-out folds, personalization split, input hashes); `--verify`; deterministic |
+| P1-C1/A3 DMD labels | same | done, **every DMD label name unverified** | `data/dmd.py` parser for OpenLABEL/VCD-style JSON, `configs/label_map_dmd.yaml` |
+| P1-B1 UAH loader | `feat/b-uah-loader` | done, synthetic tree only | `data/uah.py`, `scripts/process_uah.py`, `configs/uah.yaml`, `configs/label_map_uah.yaml`; fails loudly (`UAHFormatError`) when a real file differs; prints per-behaviour event counts |
+| P1-D1 own-data pipeline | `feat/d-own-pipeline` | done, synthetic recording only | `data/own.py`, `scripts/process_own.py`, `configs/own.yaml`; tap-based clock sync recovers offset and drift well inside 100 ms on synthetic data; a missing or ambiguous sync event raises `SyncError` |
+
+### New assumptions from the agents (please confirm or overrule; full lists are in each module's docstring)
+| ID | Assumption | Where |
+|---|---|---|
+| A29 | Split file: each dataset gets its own random stream (seed + dataset name); defaults seed 0, fractions 70/15/15; leave-one-driver-out only for `uah`, fold i tests driver i and validates on driver i+1, needs at least 3 drivers; the input hash ignores the `split` column and input names are stored relative | `make_splits.py`, `configs/splits.yaml` |
+| A30 | Personalization split: order from `<yyyymmdd>_<nn>` in the trip id; calibration = first K = 2 normal trips; evaluation = trips after the last calibration trip; a driver needs 4 trips or is reported "not enough data". Doc `04` 2.2 is silent on several points | `splits.py` |
+| A31 | DMD parser reads only `actions` with `frame_intervals` (end inclusive); class per 10 Hz step by majority (A5 rule), non-normal beats normal inside a frame, conflicting non-normal classes give -1; eye closure of 1 s to under 3 s = `micro_sleep`; off-road gaze of 2 s or more = `distraction_episode` (the 2 s and the 0.5 s merge gap are proposals) | `dmd.py` |
+| A32 | UAH layouts (accelerometer 11 columns, GPS 9, lane 5, events 6), units (G, km/h), axes (Z longitudinal, Y lateral, X vertical without gravity), lane state 2 = detected, events are points in time, all severity levels kept. **The repo docs disagree on the accelerometer column count (11 in doc 11, 12 in the human-task pack and its test); the loader uses 11** | `configs/uah.yaml`, `uah.py` |
+| A33 | Own pipeline: phone clock is the reference; one tap pair in each of the first and last 120 s while speed is at most 0.5 m/s; drift corrected only above 50 ms (contract 8.4); camera tap times come from new optional trip-sheet columns `video_sync_start_s` / `video_sync_end_s`; the visual blink sync of `06` is not used because it cannot reach 100 ms; class labels from a `trip_id,class,onset_s,offset_s` CSV; `quality` goes into meta, not the manifest | `own.py`, `configs/own.yaml` |
+
+### Open questions raised by the agents (your call; none blocks the next step)
+1. Commit frozen `splits.json` files, and where? The default `data/processed/splits.json` is git-ignored. Keep the seed at 0?
+2. DMD: is a 2 s minimum right for `distraction_episode`? What about `talking_to_passenger` and `change_gear`? Label DMD drowsiness sessions at session level?
+3. **UAH events below 50 km/h are "not logged", but `y_risk` treats those stretches as 0.** Should `WindowDataset` mask risk targets outside the logged speed segments? This is a contract change; nothing was changed. Should level-1 UAH inertial events count as harsh? (the loader keeps all)
+4. Approve adding `video_sync_start_s` / `video_sync_end_s` to the trip-sheet template and doc `06` section 6, and how people read them off the video (tap sound in the audio, or the frame where the finger hits)?
+5. Doc `06` section 5 step 8 still names raw files without the `own_` prefix (open fix F11); doc `04` section 1 says blinks pin the sync, which contradicts `06`.
+6. Add `quality` to `schema.MANIFEST_COLUMNS` now? Should `webcam_features.py` write a small sidecar with the EAR threshold?
+7. Dashboard: the 0.4 / 0.7 gauge bands are display-only until the P4 severity mapping exists.
+
+### Not verified
+- No real data of any kind. UAH, DMD and logging-app formats come from documents and memory and are marked UNVERIFIED in code; the first real download will probably break something, and the loaders are built to say exactly what.
+- No integration run of UAH loader -> splits -> `WindowDataset` on one tree (each was tested alone, plus the validator). That is the first thing to do when UAH arrives.
+- The preview window and the dashboard were never seen by a human; the head-pose signs and the EAR threshold after the aspect-ratio fix still wait for the next webcam run.
+- Agent process notes: one agent briefly created a stray folder through a bad path (removed and checked); two used a shell heredoc once instead of the file tools (results checked and committed).
 
 ---
 
