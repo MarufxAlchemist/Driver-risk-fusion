@@ -95,18 +95,28 @@ class FaceLandmarkerAdapter:
 
 def run_on_frames(
     frames: Iterator[tuple[float, np.ndarray]], model_path: Path | None = None
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """`(t_s, rgb)` pairs -> `(t [F], landmarks [F, 478, 3], matrices [F, 4, 4])`."""
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, tuple[int, int]]:
+    """`(t_s, rgb)` pairs -> `(t [F], landmarks [F, 478, 3], matrices [F, 4, 4], (W, H))`.
+
+    Pass `(W, H)` to `vision.extract_vision_features(image_size=...)`: MediaPipe's normalized
+    coordinates are only proportional on square images.
+    """
     ts, lms, mats = [], [], []
+    size: tuple[int, int] | None = None
     with FaceLandmarkerAdapter(model_path) as adapter:
         for t_s, rgb in frames:
+            h, w = rgb.shape[:2]
+            if size is None:
+                size = (w, h)
+            elif size != (w, h):
+                raise ValueError(f"frame size changed from {size} to {(w, h)}")
             lm, mat = adapter.process(rgb, t_s)
             ts.append(t_s)
             lms.append(lm)
             mats.append(mat)
-    if not ts:
+    if not ts or size is None:
         raise ValueError("no frames")
-    return np.array(ts), np.stack(lms), np.stack(mats)
+    return np.array(ts), np.stack(lms), np.stack(mats), size
 
 
 def video_frames(

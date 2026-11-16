@@ -251,3 +251,58 @@ def test_features_are_causal() -> None:
 
 def test_config_matches_the_contract_mask_threshold() -> None:
     assert V.load_vision_config()["face_conf_min"] == S.FACE_CONF_MIN
+
+
+# --- fixes after the first real-face webcam run (2026-11-16) --------------------------------
+def test_ear_does_not_depend_on_the_camera_aspect_ratio() -> None:
+    """MediaPipe scales x by the width and y by the height; EAR must use real proportions."""
+    cfg = V.load_vision_config()
+    square = face(ear_r=0.30, ear_l=0.30)
+    raw = square.copy()
+    raw[:, 1] = 0.5 + (square[:, 1] - 0.5) * (640 / 480)  # how a 640x480 camera reports it
+    wrong = V.frame_features(raw, rot(), cfg)["ear_mean"]
+    right = V.frame_features(raw, rot(), cfg, aspect_hw=480 / 640)["ear_mean"]
+    assert wrong == pytest.approx(0.40)  # the bug: 4:3 inflates EAR by a third
+    assert right == pytest.approx(0.30)
+
+
+def test_ear_uses_depth_so_a_turned_face_keeps_its_ratio() -> None:
+    cfg = V.load_vision_config()
+    f = face(ear_r=0.30, ear_l=0.30)
+    a = np.radians(30.0)  # turn every point about the vertical axis through the face centre
+    x, z = f[:, 0] - 0.5, f[:, 2]
+    f[:, 0], f[:, 2] = 0.5 + x * np.cos(a) + z * np.sin(a), -x * np.sin(a) + z * np.cos(a)
+    assert V.frame_features(f, rot(), cfg)["ear_mean"] == pytest.approx(0.30, abs=1e-9)
+
+
+def test_eyes_are_not_read_beyond_the_yaw_limit() -> None:
+    cfg = V.load_vision_config()
+    limit = cfg["eye_max_abs_yaw_deg"]
+    far = V.frame_features(face(iris_dx=-1.0), rot(yaw=limit + 5), cfg)
+    assert np.isnan(far["ear_mean"]) and np.isnan(far["ear_left"]) and np.isnan(far["ear_right"])
+    assert far["gaze_yaw"] == pytest.approx(limit + 5)  # head pose only
+    near = V.frame_features(face(), rot(yaw=limit - 5), cfg)
+    assert near["ear_mean"] == pytest.approx(0.30)
+
+
+def test_turned_head_steps_have_no_eye_state_but_keep_the_face() -> None:
+    t, lm, mats = frames(60)
+    mats[30:] = rot(yaw=60.0)
+    res = V.extract_vision_features(t, lm, mats)
+    assert np.isnan(col(res, "eye_closed")[15]) and np.isnan(col(res, "blink")[15])
+    assert col(res, "eye_closed")[5] == 0.0
+    assert col(res, "face_visible")[15] == 1.0 and res.frame[S.COL_MASK_V].iloc[15]
+
+
+def test_iris_offset_is_clamped() -> None:
+    cfg = V.load_vision_config()
+    g = V.frame_features(face(iris_dx=-6.0), rot(), cfg)
+    cap = cfg["gaze"]["iris_max_offset"]
+    assert g["gaze_yaw"] == pytest.approx(cfg["gaze"]["yaw_gain_deg"] * cap)
+
+
+def test_extractor_takes_the_image_size() -> None:
+    t, lm, mats = frames(30)
+    lm[:, :, 1] = 0.5 + (lm[:, :, 1] - 0.5) * (1280 / 720)  # 16:9 camera
+    res = V.extract_vision_features(t, lm, mats, image_size=(1280, 720))
+    assert col(res, "ear_mean")[5] == pytest.approx(0.30, abs=1e-5)

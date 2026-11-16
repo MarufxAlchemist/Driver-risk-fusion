@@ -18,10 +18,11 @@ pytestmark = pytest.mark.skipif(
 def test_frames_without_a_face_give_nan_and_feed_the_extractor() -> None:
     blank = np.full((240, 320, 3), 127, dtype=np.uint8)
     frames = ((k / 15.0, blank) for k in range(15))
-    t, lm, mats = FL.run_on_frames(frames)
+    t, lm, mats, size = FL.run_on_frames(frames)
+    assert size == (320, 240)
     assert lm.shape == (15, FL.N_LANDMARKS, 3) and mats.shape == (15, 4, 4)
     assert np.isnan(lm).all()
-    res = V.extract_vision_features(t, lm, mats)
+    res = V.extract_vision_features(t, lm, mats, image_size=size)
     assert (res.frame["v_face_visible"] == 0).all() and not res.frame["mask_v"].any()
 
 

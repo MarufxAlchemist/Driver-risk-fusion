@@ -10,10 +10,13 @@ ear_threshold: 0.21          # global default; a per-driver value replaces it af
 blink_max_s: 0.4             # a closure this short or shorter is a blink, longer is not
 perclos_min_history_s: 10.0  # PERCLOS is NaN until this much valid eye data is in the window
 face_conf_min: 0.5           # contract mask rule (must equal schema.FACE_CONF_MIN)
+eye_max_abs_yaw_deg: 35.0    # beyond this head yaw the eyes are not read (first webcam run:
+                             # EAR jumped to 0.8-1.6 at yaw 50-65 deg)
 
 gaze:
   yaw_gain_deg: 30.0         # iris offset of one half eye-width -> this many degrees of gaze yaw
   pitch_gain_deg: 20.0       # iris offset of one eye-height -> this many degrees of gaze pitch
+  iris_max_offset: 1.5       # clamp; an iris cannot sit outside its eye (webcam run gave -170 deg)
 
 off_road:                    # gaze outside this box counts as off-road
   abs_yaw_deg: 20.0

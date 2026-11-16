@@ -64,7 +64,9 @@ def load_vision_config(path: str | Path | None = None) -> dict[str, Any]:
 
 # --- per-frame geometry ---------------------------------------------------------------------
 def _dist(p: np.ndarray, a: int, b: int) -> float:
-    return float(np.linalg.norm(p[a, :2] - p[b, :2]))
+    """3D distance. MediaPipe's z uses about the same scale as x, and including it undoes most
+    of the shortening of horizontal distances when the head turns."""
+    return float(np.linalg.norm(p[a, :3] - p[b, :3]))
 
 
 def eye_aspect_ratio(p: np.ndarray, eye: tuple[int, ...]) -> float:
@@ -124,20 +126,34 @@ def frame_features(
     matrix: np.ndarray | None,
     cfg: dict[str, Any],
     ear_threshold: float | None = None,
+    aspect_hw: float = 1.0,
 ) -> dict[str, float]:
-    """Continuous features of one frame that has a face. `landmarks [468 or 478, 3]`."""
-    p = np.asarray(landmarks, dtype=np.float64)
+    """Continuous features of one frame that has a face. `landmarks [468 or 478, 3]`.
+
+    `aspect_hw` = image height / width. MediaPipe divides x by the width and y by the height,
+    so y is rescaled to width units before any distance is taken; without this, EAR on a 4:3
+    camera is a third too large and changes with the camera.
+    """
+    raw = np.asarray(landmarks, dtype=np.float64)
+    p = raw.copy()
+    p[:, 1] *= aspect_hw
     thr = cfg["ear_threshold"] if ear_threshold is None else ear_threshold
-    ear_r, ear_l = eye_aspect_ratio(p, RIGHT_EYE), eye_aspect_ratio(p, LEFT_EYE)
-    ear = (ear_r + ear_l) / 2.0
     yaw, pitch, roll = head_pose(matrix) if matrix is not None else (np.nan,) * 3
+    eyes_readable = not (np.isfinite(yaw) and abs(yaw) > cfg["eye_max_abs_yaw_deg"])
+    if eyes_readable:
+        ear_r, ear_l = eye_aspect_ratio(p, RIGHT_EYE), eye_aspect_ratio(p, LEFT_EYE)
+    else:  # far eye hidden, near eye seen edge-on: no eye state rather than a wrong one
+        ear_r = ear_l = float("nan")
+    ear = (ear_r + ear_l) / 2.0
     gaze_yaw, gaze_pitch = yaw, pitch
     if len(p) > max(RIGHT_IRIS, LEFT_IRIS) and np.isfinite(ear) and ear >= thr:
         dh, dv = _iris_offsets(p)
         if np.isfinite(dh):
+            cap = cfg["gaze"]["iris_max_offset"]
+            dh, dv = float(np.clip(dh, -cap, cap)), float(np.clip(dv, -cap, cap))
             gaze_yaw = yaw - cfg["gaze"]["yaw_gain_deg"] * dh  # image-left = driver's right
             gaze_pitch = pitch - cfg["gaze"]["pitch_gain_deg"] * dv  # image-up = looking up
-    mesh = p[:N_MESH, :2]
+    mesh = raw[:N_MESH, :2]  # inside-the-image test in MediaPipe's own [0, 1] units
     inside = ((mesh >= 0.0) & (mesh <= 1.0)).all(axis=1)
     return {
         "ear_left": ear_l, "ear_right": ear_r, "ear_mean": ear, "mar": mouth_aspect_ratio(p),
@@ -178,12 +194,14 @@ def extract_vision_features(
     *,
     config: dict[str, Any] | None = None,
     ear_threshold: float | None = None,
+    image_size: tuple[int, int] | None = None,
 ) -> VisionResult:
     """Vision features on the 10 Hz grid.
 
     `t_frame [F]` seconds since trip start (sorted), `landmarks [F, 468|478, 3]` with NaN rows
     for frames where no face was found, `matrices [F, 4, 4]` face transforms (or None).
     `ear_threshold` given = a per-driver calibrated value; otherwise the config default.
+    `image_size=(width, height)` of the frames; needed for correct ratios on non-square images.
     """
     cfg = config or load_vision_config()
     dt = S.STEP_S
@@ -191,6 +209,7 @@ def extract_vision_features(
     source = "global_default" if ear_threshold is None else "driver_calibrated"
     t_frame = np.asarray(t_frame, dtype=np.float64)
     landmarks = np.asarray(landmarks, dtype=np.float64)
+    aspect_hw = image_size[1] / image_size[0] if image_size else 1.0
     n = int(np.floor(t_frame[-1] / dt + 1e-9)) + 1
     idx = np.ceil(t_frame / dt - 1e-9).astype(np.int64)
 
@@ -205,7 +224,8 @@ def extract_vision_features(
         n_all[k] += 1
         if np.isnan(landmarks[f, 0, 0]):
             continue  # no face in this frame: counts towards the step, adds confidence 0
-        feats = frame_features(landmarks[f], None if matrices is None else matrices[f], cfg, thr)
+        mat = None if matrices is None else matrices[f]
+        feats = frame_features(landmarks[f], mat, cfg, thr, aspect_hw)
         n_face[k] += 1
         conf_sum[k] += feats["face_conf"]
         sums[k] += [feats[c] for c in _CONTINUOUS]
@@ -254,6 +274,7 @@ def extract_vision_features(
         frame[S.VISION_PREFIX + "face_conf"] >= S.FACE_CONF_MIN
     )
     meta = {
+        "image_size": list(image_size) if image_size else None,
         "ear_threshold": thr,
         "ear_threshold_source": source,
         "vision_extractor": EXTRACTOR,
