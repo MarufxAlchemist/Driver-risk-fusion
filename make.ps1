@@ -28,5 +28,6 @@ switch ($Target) {
     "test"      { Run @("uv", "run", "pytest", "-m", "not slow") }
     "demo-stub" { Run @("uv", "run", "python", "scripts/demo_stub.py") }
     "serve"     { Run @("uv", "run", "python", "scripts/mock_server.py") }
-    default     { Write-Error "Unknown target '$Target'. Use: setup, lint, format, test, demo-stub, serve" }
+    "webcam"    { Run @("uv", "run", "--group", "vision", "python", "scripts/webcam_features.py", "--seconds", "30") }
+    default     { Write-Error "Unknown target '$Target'. Use: setup, lint, format, test, demo-stub, serve, webcam" }
 }

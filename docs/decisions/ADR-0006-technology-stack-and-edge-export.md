@@ -19,7 +19,7 @@ Deciders: Maruf (Claude drafted)
 - **API:** FastAPI + Pydantic v2, uvicorn with `websockets` (needed to serve WebSockets; found by a live-socket check, the in-process test client does not need it).
 - **Quality:** ruff (lint + format), pytest, pre-commit; CI on ubuntu and windows.
 - **Windows:** `make.ps1` mirrors the Makefile targets.
-- **Vision features (P1):** MediaPipe Face Landmarker; the version is pinned when P1-A1 starts and recorded here.
+- **Vision features (P1):** MediaPipe Face Landmarker, pinned `mediapipe==1.2.3` (2026-11-16) with the model `face_landmarker/float16/1` downloaded on first use to the git-ignored `models/`. It is an **optional dependency group** (`uv sync --group vision`, `make webcam`), not installed by default or in CI, because it pulls in OpenCV, matplotlib and more, and the feature maths in `features/vision.py` does not need it. The adapter test skips when the group or the model is missing.
 - **Edge export (P5):** ONNX + ONNX Runtime for the fusion and heads; the vision path stays feature-based unless ADR-0004 says go.
 - **Tracking:** CSV plus one folder per run under `experiments/`; MLflow or W&B only if you ask for it (not needed to meet the protocol).
 
