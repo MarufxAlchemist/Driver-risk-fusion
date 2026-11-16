@@ -145,10 +145,42 @@ A10 and A11 were approved and `05` was edited to match; `contract_version` stays
 3. ~~History rewrite~~ **Decided: leave it for now** (risk R21).
 4. **Start the long-lead human tasks** (`docs/human_tasks/README.md`): DMD registration and UAH download (H1), missing papers (H10), guide meeting (H5), phone and passenger for the app test (H4, H6).
 5. ~~Say go for P1~~ **Given 2026-11-13 ("go ahead for the next hour, do what is best").**
-6. **Agree the event thresholds** in `configs/events.yaml` with the guide (they are my proposals, see below).
+6. **Run `make webcam`** (or `.\make.ps1 webcam`) once and follow the check in `scripts/webcam_features.py`: look ahead, turn right, look up, blink, close your eyes 2 s. Tell me whether yaw is positive for "right" and pitch positive for "up", and send the printout.
+7. **Agree the event thresholds** in `configs/events.yaml` with the guide (they are my proposals, see below).
 
 ## Next (P1, remaining)
-Not started: MediaPipe vision features and causal PERCLOS (P1-A1/A2; needs `mediapipe` added to the lock file, ADR-0006, and your webcam), then the loaders UAH (P1-B1), DMD (P1-A3), splits script (P1-C2) and label maps (P1-C1), which wait for the downloads (H1). The own-data pipeline (P1-D1) waits for the phone-app test (H4).
+Vision features are done in code (see the 2026-11-16 log below) but **not yet checked on a real face**. Remaining: the loaders UAH (P1-B1), DMD (P1-A3), splits script (P1-C2) and label maps (P1-C1), which wait for the downloads (H1). The own-data pipeline (P1-D1) waits for the phone-app test (H4).
+
+---
+
+## P1 work log (2026-11-16): vision features
+
+Phase: **P1 Data and features**, workstream A (vision). Branches `feat/a-vision-features`, `feat/a-face-landmarker`, merged into `dev`. Tests: **211 passed** (186 before), lint clean, `uv lock --check` clean.
+
+| Task | State | What it is |
+|---|---|---|
+| P1-A1 vision features | done in code, **synthetic landmarks only** | `features/vision.py`: EAR (both eyes, mean), MAR, head yaw/pitch/roll from the face transform, iris-based gaze proxy with head-pose fallback, face-confidence proxy, per-step means, no-face rule, mask rule. 23 tests with landmark geometry whose answers are known exactly, incl. causality and the contract validator |
+| P1-A2 PERCLOS, blink, eye_closed | done in code, synthetic only | causal; global EAR threshold 0.21 from `configs/vision.yaml` until per-driver calibration; threshold and source go into trip meta |
+| MediaPipe adapter | done, smoke-tested | `features/face_landmarker.py` with the real `mediapipe==1.2.3` and model: runs, returns NaN for frames without a face, timestamps forced to increase. **Never run on a real face** |
+| Webcam check | ready, **not run** | `make webcam` / `.\make.ps1 webcam`: 30 s, prints ranges and blink counts, saves a plot under `demo_out/vision/` (git-ignored). Nothing is recorded |
+| Dependency | done | MediaPipe is an optional uv group `vision` (ADR-0006 updated); CI does not install it, so the adapter test is skipped there |
+
+I did **not** switch on your webcam: it is reachable from this machine, but filming you without asking is not mine to do, and the sign check needs you to make the movements.
+
+### New assumptions (please confirm or overrule)
+
+| ID | Assumption | Where |
+|---|---|---|
+| A24 | Eye sides are the driver's: `ear_left` = driver's left eye = MediaPipe points 362/385/387/263/373/380, iris 473. Frames must not be mirrored | `vision.py` |
+| A25 | Head pose sign convention: positive yaw = head turned to the driver's right, positive pitch = looking up, positive roll = tilt towards the right shoulder, derived assuming MediaPipe's camera frame is x right, y up, z towards the camera. **Unverified on a real face**; the webcam check decides | `vision.head_pose` |
+| A26 | `face_conf` = share of the 468 mesh points inside the image (the Face Landmarker gives no per-face score) | `vision.frame_features` |
+| A27 | Gaze proxy = head pose + gain x iris offset (30 deg per half eye-width, 20 deg per eye-height), head pose only while the eyes are closed; off-road = \|yaw\| > 20 deg, pitch < -15 deg or > 20 deg. All placeholders, to calibrate on webcam and DMD | `configs/vision.yaml` |
+| A28 | `blink` = 1 on the step the eye reopens after a closure of at most 0.4 s; longer closures are not blinks (micro-sleep candidates for the annotation/event side). Step flags come from step means, not per-frame maxima | `vision.py` |
+
+### Not verified
+- Nothing has seen a real face. The landmark indices, the eye sides and the head-pose signs come from the MediaPipe Face Mesh layout as I know it and from first principles; the webcam check is the first real test.
+- The EAR threshold 0.21 is generic. Per-driver calibration is P4 (and DMD needs the default always).
+- Frame rates other than 30 fps were tested only with a hand-made sparse sequence.
 
 ---
 
