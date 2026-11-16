@@ -70,7 +70,7 @@ class _State:
         now = _now()
         self.drivers: dict[str, M.Driver] = {
             DEMO_DRIVER_ID: M.Driver(
-                driver_id=DEMO_DRIVER_ID, created_at=now, calibration=_calibration(143)
+                driver_id=DEMO_DRIVER_ID, created_at=now, calibration=_calibration(WINDOWS_REQUIRED)
             )
         }
         self.trips: dict[str, M.TripInfo] = {}
@@ -283,6 +283,8 @@ def create_app(api_key: str | None = None, stream_delay_s: float = 1.0) -> FastA
             for message in scripted_messages(trip_id, trip.driver_id):
                 await ws.send_text(message.model_dump_json())
                 await asyncio.sleep(state.stream_delay_s)
+            if state.trips[trip_id].ended_at is None:  # the scripted stream ends with trip_ended
+                state.trips[trip_id] = state.trips[trip_id].model_copy(update={"ended_at": _now()})
             await ws.close()
         except WebSocketDisconnect:
             return
