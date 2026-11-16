@@ -241,7 +241,9 @@ def test_conflicting_classes_give_unlabelled_steps() -> None:
     out = D.dmd_labels(_doc(scene), _map(), fps=FPS, n_frames=N_FRAMES)
     assert (out.y_cls[5:45] == S.CLASS_TO_ID["distracted"]).all()
     assert (out.y_cls[55:] == S.UNLABELED).all()
-    assert out.report.conflict_frames == 150
+    # frames 150-297: frames 298 and 299 fall into step 100, past the grid (as in vision.py)
+    assert out.report.conflict_frames == 148
+    assert out.report.clipped_intervals == 0  # the unused tail frames are not "clipping"
 
 
 def test_frames_without_class_evidence_stay_unlabelled() -> None:
