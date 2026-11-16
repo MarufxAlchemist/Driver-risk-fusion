@@ -167,6 +167,13 @@ Phase: **P1 Data and features**, workstream A (vision). Branches `feat/a-vision-
 
 I did **not** switch on your webcam: it is reachable from this machine, but filming you without asking is not mine to do, and the sign check needs you to make the movements.
 
+### First real-face webcam run (2026-11-16, Maruf's laptop camera, 30 s, 30 fps)
+Worked: eyes open EAR about 0.33-0.40, closed about 0.08, so the 0.21 threshold separates them; 11 blinks, a long closure, 95% of steps usable. Found and fixed (`fix/a-vision-real-face`, 6 new tests, 217 passed):
+1. EAR was about 1.33x too large on a 4:3 camera, because MediaPipe divides x by the width and y by the height. Distances are now taken in width units; the adapter returns the frame size.
+2. EAR jumped to 0.8-1.6 and gaze yaw to -170 deg with the head turned 50-65 deg. Distances now include MediaPipe's z, eyes are not read beyond |yaw| 35 deg (no eye state rather than a wrong one), and the iris offset is clamped to 1.5.
+3. **Head-pose signs still open:** yaw went to -66 deg first (about 1.5 s), +58 deg at 13 s, pitch +46 deg at 15.5 s. Waiting for Maruf to say which way he turned first. Baseline pitch was about -7 deg (camera above the face), which the personal baseline will absorb.
+The EAR threshold 0.21 was set before fix 1; after it, open-eye EAR will read lower (about 0.25-0.30), so the threshold must be re-checked on the next run.
+
 ### New assumptions (please confirm or overrule)
 
 | ID | Assumption | Where |
