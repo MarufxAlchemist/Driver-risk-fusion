@@ -1,7 +1,7 @@
 # Targets work with GNU make (Mac/Linux, or mingw32-make on Windows).
 # Windows without make: use .\make.ps1 <target>, which runs the same commands.
 
-.PHONY: setup lint format test demo-stub serve
+.PHONY: setup lint format test demo-stub serve webcam
 
 setup:
 	uv sync
@@ -23,3 +23,7 @@ demo-stub:
 
 serve:
 	uv run python scripts/mock_server.py
+
+# Vision check on your webcam (installs the optional MediaPipe group on first use).
+webcam:
+	uv run --group vision python scripts/webcam_features.py --seconds 30

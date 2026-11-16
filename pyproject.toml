@@ -24,6 +24,11 @@ dev = [
     "ruff>=0.6",
     "pre-commit>=3.8",
 ]
+# Optional: MediaPipe for real video (P1-A1). Not installed by default or in CI, because the
+# feature maths in features/vision.py needs none of it. Install with `uv sync --group vision`.
+vision = [
+    "mediapipe==1.2.3",
+]
 
 [build-system]
 requires = ["hatchling>=1.25"]
