@@ -27,7 +27,9 @@ FILE_PREFIXES = {
     "sem_final": "SEMANTIC_FINAL",
     "sem_online": "SEMANTIC_ONLINE",
 }
-FOLDER_RE = re.compile(r"^(\d{14})-([\d.]+)km-(D\d+)-([A-Za-z]+)-([A-Za-z]+)$")
+# Real names carry a digit after the behaviour for the two normal secondary-road trips of each
+# driver: ...-D1-NORMAL1-SECONDARY (verified on the download, 2026-11-18; 10 of 40 routes).
+FOLDER_RE = re.compile(r"^(\d{14})-([\d.]+)km-(D\d+)-([A-Za-z]+\d*)-([A-Za-z]+)$")
 
 
 @dataclass
@@ -91,7 +93,8 @@ def inspect_trip(folder: Path) -> TripInfo:
     info = TripInfo(folder.name, parsed=m is not None)
     if m:
         info.date, info.distance_km = m[1], float(m[2])
-        info.driver, info.behavior, info.road = m[3].upper(), m[4].upper(), m[5].upper()
+        info.driver, info.road = m[3].upper(), m[5].upper()
+        info.behavior = re.sub(r"\d+$", "", m[4].upper())  # NORMAL1 -> NORMAL
     info.has_video = any(p.suffix.lower() in {".mp4", ".avi", ".mov"} for p in folder.iterdir())
     for key, prefix in FILE_PREFIXES.items():
         path = find_file(folder, prefix)

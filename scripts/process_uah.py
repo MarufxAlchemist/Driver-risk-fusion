@@ -43,7 +43,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{args.root} is not a folder. Download UAH-DriveSet first (docs/human_tasks).")
         return 2
     out = args.out or processed_dir("uah")
-    print("NOTE: the UAH file format in configs/uah.yaml is UNVERIFIED (from the paper).")
+    print(
+        "NOTE: configs/uah.yaml was checked on the real download on 2026-11-18; see the "
+        "UNVERIFIED list in each trip's meta for what is still open."
+    )
     try:
         result = process_dataset(
             args.root, out, load_uah_config(args.config), load_label_map(args.label_map),

@@ -57,3 +57,38 @@ def test_unparsed_folders_are_reported_not_guessed(tree: Path) -> None:
 def test_folder_regex_rejects_garbage() -> None:
     assert FOLDER_RE.match("20151111123124-25km-D1-NORMAL-MOTORWAY")
     assert not FOLDER_RE.match("D1")
+
+
+# --- found on the real download (2026-11-18) -------------------------------------------------
+def test_folder_regex_accepts_a_digit_after_the_behaviour() -> None:
+    """Real names: ...-D1-NORMAL1-SECONDARY and ...-D1-NORMAL2-SECONDARY (10 of the 40 trips)."""
+    for name in (
+        "20151110175712-16km-D1-NORMAL1-SECONDARY",
+        "20151110180824-16km-D1-NORMAL2-SECONDARY",
+    ):
+        m = FOLDER_RE.match(name)
+        assert m is not None and m[4].startswith("NORMAL")
+
+
+def test_a_file_without_numeric_rows_is_reported_not_a_crash(tmp_path: Path) -> None:
+    """PROC_OPENSTREETMAP_DATA.txt is text: no numeric rows, so no rate."""
+    f = tmp_path / "PROC_OPENSTREETMAP_DATA.txt"
+    f.write_text("10.0 some road name\n", encoding="utf-8")
+    info = read_table(f)
+    assert info.n_rows == 0 and not np.isfinite(info.median_rate_hz)
+
+
+def test_inspect_script_survives_a_file_kind_with_no_rate(tree: Path, capsys) -> None:
+    import importlib.util
+
+    from driverisk.utils.paths import repo_root
+
+    trip = next(tree.rglob("20151111123124*"))
+    (trip / "PROC_OPENSTREETMAP_DATA.txt").write_text("10.0 a road\n", encoding="utf-8")
+    spec = importlib.util.spec_from_file_location(
+        "inspect_uah", repo_root() / "scripts" / "inspect_uah.py"
+    )
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.main([str(tree)]) == 0
+    assert "osm" in capsys.readouterr().out

@@ -83,13 +83,22 @@ SCENE = [
 # --- the shipped proposal ---------------------------------------------------------------------
 
 
-def test_shipped_map_is_a_proposal_with_every_label_unverified() -> None:
+# Names seen in three real DMD drowsiness files on 2026-11-18 (gA/1, gA/5, gB/6, session s5).
+CHECKED_ON_REAL_FILES = {
+    "eyes_state/open", "eyes_state/close", "eyes_state/opening", "eyes_state/closing",
+    "eyes_state/undefined", "blinks/blinking", "yawning/Yawning with hand",
+    "yawning/Yawning without hand",
+}  # fmt: skip
+
+
+def test_shipped_map_is_a_proposal_and_only_the_checked_labels_are_verified() -> None:
     path = configs_dir() / "label_map_dmd.yaml"
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert "proposal" in raw["status"].lower() and "guide" in raw["status"].lower()
     lm = D.load_label_map(path)
     assert lm.labels, "the proposal lists labels"
-    assert all(r.status == D.UNVERIFIED for r in lm.labels.values())
+    verified = {n for n, r in lm.labels.items() if r.status == D.VERIFIED}
+    assert verified == CHECKED_ON_REAL_FILES  # the distraction/gaze names are still from memory
     assert all(r.cls in (None, *S.CLASSES) for r in lm.labels.values())
     assert all(r.cls != "aggressive" for r in lm.labels.values())  # DMD has no vehicle motion
     assert all(r.event in (None, *S.EVENT_TYPES) for r in lm.labels.values())
