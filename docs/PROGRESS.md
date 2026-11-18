@@ -153,6 +153,43 @@ All P1 tasks now exist in code (see the 2026-11-16 logs below), all tested on sy
 
 ---
 
+## First real data (2026-11-18): UAH-DriveSet and three DMD drowsiness sessions
+
+Maruf downloaded UAH-DriveSet v1 (all 40 routes, 6 drivers, 524 min) and three DMD drowsiness sessions (gA/1, gA/5, gB/6, session s5) and extracted them under `data/raw/` (git-ignored; both licences forbid redistributing the data). This is the first time any loader met real files. Tests: **408 passed** (11 of them run only where the real data exists). Branch `fix/b-uah-real-files`, merged.
+
+**Result: all 40 UAH routes convert and pass the contract validator; the DMD parser reads all three annotation files with no unknown label.** The full chain (make_splits -> `WindowDataset` -> normalization -> toy fusion forward pass) runs on the real processed UAH: splits 4/1/1 drivers (26/7/7 trips), 21,080 / 5,332 / 4,855 windows, classes normal / aggressive / drowsy all present, no unexpected NaN columns.
+
+### What the real files contradicted (all fixed and tested; docs 03 section 3.1, 4.4 and the human-task pack corrected)
+| Assumption (from paper / memory) | Reality | Fix |
+|---|---|---|
+| Folder names are `...-D1-NORMAL-SECONDARY` | 10 of 40 are `NORMAL1` / `NORMAL2` | regex accepts a digit; behaviour normalised, raw kept in meta |
+| `RAW_GPS` has 9 columns | **12** (the first 9 as assumed, last three 0) | config |
+| Lane state 2 = detected | states **1 and 2** carry offsets; 0, -1, -9 do not (state 2 only would have dropped 8% of valid data) | `lane.valid_states: [1, 2]` |
+| `yaw_rate = d(unwrap(yaw))/dt` (contract 4.4) | the yaw column spans about **3 deg per route**: it is phone attitude, not a heading, so the rule would have produced noise | `yaw_rate` is NaN for UAH; turn rate = `heading_rate` from GPS course |
+| Accelerometer 11 vs 12 columns (docs disagreed) | **11** | docs fixed |
+| Timestamps strictly increasing | 32 of 40 files repeat a timestamp in 4-5 start-up rows (`active` = 0), 150 rows in all; D6 DROWSY-MOTORWAY ends with an **exact copy of its last 10 s**; two events files are unsorted; one is empty; some folders hold `*.txt~` backups | last row of a repeated timestamp kept, exact duplicates dropped, events sorted, empty = no events, backups ignored; all counted in each trip's meta |
+| `inspect_uah.py` always works | crashed on the text-only OpenStreetMap file | fixed |
+
+Confirmed as assumed: G units with no gravity in any axis (largest value 0.66 G); **Z is longitudinal with + forward** (Z is negative in 100% of braking events and positive in 87% of acceleration events); event codes 1 braking, 2 turn, 3 acceleration; speed in km/h; the accelerometer `active` flag agrees with "GPS speed above 50 km/h" 99% of the time; accelerometer 10 Hz, GPS 1 Hz.
+
+**P1-B3 check passed on real data:** inertial events per hour above 50 km/h: aggressive 166, drowsy 63, normal 31.
+
+### Still unverified on UAH
+Left/right sign of the lateral axis (Y), that X is vertical (only that it is not longitudinal), GPS course is clockwise, what event levels 1-3 mean, the video content (nobody has opened a UAH video).
+
+### DMD findings (three drowsiness sessions) and a decision for you
+- Format as assumed: `openlabel` -> `actions` (`type`, `frame_intervals`, end inclusive); 1280x720 at 29.76 fps; annotation frame counts 5481 / 5287 / 5410 against 5480 / 5287 / 5410 video frames (gA_1 has one extra annotated frame). Label names seen: `eyes_state/{open,close,opening,closing,undefined}`, `blinks/blinking`, `yawning/Yawning with hand|without hand`; the 8 are now marked verified. Occlusion labels (face / body / hands) exist per the readme but did not appear in these three files.
+- **Only 12-20% of steps get a class (all `drowsy`); the rest are unlabelled, and there is no `normal` at all.** The session s5 activities (safe driving, sleepy driving, microsleep) are not in the JSON. Micro-sleep events kept: 6 / 4 / 1; 22 / 26 / 12 closures were shorter than 1 s and rejected (blink-length).
+- **Decision needed (guide-level):** where does the `normal` class for DMD come from? Options: (a) take `normal` from the DMD **Distraction** set, whose `driver_actions/safe_drive` label is the normal-driving label (names still unverified until it is downloaded), and use the drowsiness sessions only as positive evidence; (b) label "eyes open, no closure, no yawn" stretches of the drowsiness sessions as normal, which risks calling early sleepy driving normal. I recommend (a).
+
+### Next
+1. Download the DMD **Distraction** set (and, later, the remaining Drowsiness files) and check its labels.
+2. Run the loaders again after any change: `uv run python scripts/process_uah.py data/raw/uah_driveset --out data/processed/uah --keep-going --overwrite`.
+3. The DMD loader still only does labels; video -> vision-feature parquet (frame-by-frame MediaPipe on face videos, 1280x720) is the next code task and takes a long time to run (about 5,400 frames per session).
+4. The P1 gate needs: UAH done (yes), DMD vision features from real video (not yet), own pilot data (needs phone test and recordings).
+
+---
+
 ## P1 work log (2026-11-16, later): four parallel agents, preview window, mock fixes
 
 Phase: **P1 Data and features**. Four sub-agents each worked test-first in their own git worktree and branch. I reviewed every diff (purely additive apart from one comment line in `motion.py`), merged with `--no-ff`, and ran lint plus the full suite on the combination. Tests: **384 passed** (222 before the agents), lint clean. **Nothing here has touched real data**: UAH and DMD are not downloaded and no real recording exists.

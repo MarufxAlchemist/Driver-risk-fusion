@@ -37,27 +37,27 @@ Fill in the "Verified" column when someone has downloaded and inspected the data
 
 | Item | Expected | Verified |
 |---|---|---|
-| Drivers / vehicles | Small number of drivers (about 6) | [ ] |
-| Behaviours | normal, drowsy, aggressive (trip-level styles) | [ ] |
-| Road types | motorway, secondary road | [ ] |
-| Raw accelerometer rate | about 10 Hz, with filtered acceleration and roll/pitch/yaw | [ ] |
-| GPS rate | about 1 Hz | [ ] |
-| Video | Road-ahead camera, not the driver's face | [ ] |
-| Derived files | Lane detection, vehicle detection, map data, inertial events, semantic labels | [ ] |
-| Distraction label | **None expected** | [ ] |
-| License / citation terms | Read before use | [ ] |
+| Drivers / vehicles | Small number of drivers (about 6) | [x] 6 drivers D1-D6 (2026-11-18); vehicles are not in the files (README: one vehicle per driver) |
+| Behaviours | normal, drowsy, aggressive (trip-level styles) | [x] 40 routes: normal 17, drowsy 12, aggressive 11; 524 min in all. Ten normal routes are named `NORMAL1` / `NORMAL2` |
+| Road types | motorway, secondary road | [x] motorway 18, secondary 22 |
+| Raw accelerometer rate | about 10 Hz, with filtered acceleration and roll/pitch/yaw | [x] 10 Hz, 11 columns in all 40 files: time, active flag, raw X/Y/Z, Kalman X/Y/Z, roll, pitch, yaw. In G, no gravity. The "yaw" column is the phone's attitude (about 3 deg of range per route), not a heading |
+| GPS rate | about 1 Hz | [x] 1 Hz, **12 columns** (time, speed km/h, lat, lon, altitude, two accuracies, course, course change, then three more that are 0) |
+| Video | Road-ahead camera, not the driver's face | [ ] one `.mp4` per route is present; nobody has opened one yet |
+| Derived files | Lane detection, vehicle detection, map data, inertial events, semantic labels | [x] all present. Lane detection 5 columns at about 33 Hz (states 1 and 2 = detected; 0, -1, -9 = not). Inertial events 6 columns (1 braking, 2 turn, 3 acceleration; level 1-3). Some folders hold editor backups (`*.txt~`); one events file is empty, two are not sorted by time; one accelerometer file ends with an exact copy of its last 10 s |
+| Distraction label | **None expected** | [x] no ground-truth label. `SEMANTIC_ONLINE` has an app-estimated "distracted" ratio (last column); it is the app's own estimate, not an annotation, and is not used |
+| License / citation terms | Read before use | [x] non-commercial research use; cite the paper; **do not distribute the dataset or modified versions** (derived models and abstract annotations are allowed). Keep it out of git and out of public uploads |
 
 ### 3.2 DMD (owner: Anuja)
 
 | Item | Expected | Verified |
 |---|---|---|
-| Subjects | Several tens of drivers | [ ] |
-| Views | Face camera, plus body and hands views | [ ] |
-| Modalities | RGB, with depth and IR in some parts | [ ] |
-| Labels | Distraction behaviours, drowsiness related behaviours, gaze zones | [ ] |
-| Real vs simulated driving | Both, check which subsets | [ ] |
-| Vehicle motion signals | **None expected** | [ ] |
-| License / access terms | Register and accept terms before download | [ ] |
+| Subjects | Several tens of drivers | [ ] 3 sessions from 3 subjects downloaded so far (readme: 37 volunteers, groups gA, gB, ...) |
+| Views | Face camera, plus body and hands views | [x] downloaded archives hold `face` and `body` mp4 and a `mosaic` avi (1280x720, 29.76 fps); the annotation lists a hands stream whose file is not in them |
+| Modalities | RGB, with depth and IR in some parts | [x] RGB only (readme: IR and depth were removed) |
+| Labels | Distraction behaviours, drowsiness related behaviours, gaze zones | [x] drowsiness set: `eyes_state/{open,close,opening,closing,undefined}`, `blinks/blinking`, `yawning/Yawning with hand` and `without hand` (OpenLABEL JSON, frame intervals, end inclusive). The activities of session s5 (safe driving, sleepy driving, microsleep) are **not** in the JSON, so there is no "normal" label. Distraction and gaze sets: not downloaded |
+| Real vs simulated driving | Both, check which subsets | [x] drowsiness session s5 was recorded in a stationary real car, with acted drowsiness; simulator recordings are no longer public (readme) |
+| Vehicle motion signals | **None expected** | [x] none in the downloaded files |
+| License / access terms | Register and accept terms before download | [x] CC BY-NC-ND 4.0: academic use only, no commercial use, no distributing modified material; 18 or older to download |
 
 ### 3.3 Own recordings (owner: Gautam logistics, all members record)
 
@@ -133,17 +133,20 @@ Axis convention: x forward, y left, z up (right-handed), after a one-time orient
 
 `speed_bucket` (stopped / urban / highway) and `time_of_day_bucket` are derived from motion and timestamps, passed to the forecaster only.
 
-### 4.4 UAH-DriveSet conversion rules (F25; from the UAH paper, R11, not yet checked on files)
+### 4.4 UAH-DriveSet conversion rules (F25; checked on the real download, 2026-11-18)
 
-The loader must convert UAH to the units and axes of section 4.2. These rules come from reading the paper; the "Verified" column of 3.1 stays unticked until `scripts/inspect_uah.py` has been run on the real download and every rule below confirmed or corrected.
+The loader converts UAH to the units and axes of section 4.2. The rules below were written from the paper and then checked against all 40 real routes; where the paper-based text was wrong it has been corrected (marked **corrected**). `src/driverisk/data/uah.py` and `configs/uah.yaml` implement them.
 
 | Item | UAH raw | Contract | Rule |
 |---|---|---|---|
-| Acceleration unit | G | m/s^2 | multiply by 9.80665 |
-| Axes | Y lateral, Z longitudinal | x forward, y left, z up | `acc_long` from Z, `acc_lat` from Y; the sign of each is checked against braking and turning events in the data |
+| Acceleration unit | G, no gravity in any channel (checked) | m/s^2 | multiply by 9.80665 |
+| Axes | Z longitudinal, Y lateral; X is not longitudinal | x forward, y left, z up | `acc_long` from Z with sign +1 (**checked**: Z is negative in every braking event, positive in 87% of acceleration events), `acc_lat` from Y (largest at turn events; **left/right sign still unchecked**), `acc_vert` from X (assumed) |
 | Speed | GPS speed in km/h | m/s | divide by 3.6 |
-| Yaw rate | no gyro column, only roll/pitch/yaw angles | deg/s | `yaw_rate = d(unwrap(yaw))/dt` |
-| Inertial events | logged only above 50 km/h | events list | events are valid only where speed > 50 km/h; at lower speed their absence means "not logged", not "none happened" (affects FA/h, see `04`) |
+| Yaw rate | no gyro; the "yaw" column spans only about 3 deg per route, so it is the phone's attitude, not a heading | deg/s | **corrected:** `yaw_rate` is NaN for UAH (declared in meta). The turn rate is `heading_rate` from the GPS course (1 Hz). The old rule `d(unwrap(yaw))/dt` would have produced noise |
+| Inertial events | codes 1 braking, 2 turn, 3 acceleration (**checked**); logged only above 50 km/h | events list | events are valid only where speed > 50 km/h (the accelerometer `active` flag agrees with this 99% of the time); at lower speed their absence means "not logged", not "none happened" (affects FA/h and `y_risk`, see `04`) |
+| GPS | 12 columns (**corrected** from 9), speed km/h, course in degrees | m/s, deg | speed held from the latest fix; course gives `heading_rate` |
+| Lane detection | states 1 and 2 carry offsets, 0 / -1 / -9 do not (**corrected** from "only 2") | m | `lane_offset` NaN unless state is 1 or 2 |
+| Timestamps | a few repeated start-up rows per file, one exact duplicated block, unsorted event rows | - | keep the last row of a repeated timestamp, drop exact duplicates, sort events; counts go to the trip meta |
 
 ---
 
