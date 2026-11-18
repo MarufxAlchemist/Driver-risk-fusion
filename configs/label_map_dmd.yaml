@@ -1,0 +1,104 @@
+# DMD label map: DMD annotation labels -> contract classes (docs/03 section 5.1) and event types
+# (section 5.2). Read by src/driverisk/data/dmd.py.
+#
+# STATUS: PROPOSAL, TO REVIEW WITH THE GUIDE. The 8 drowsiness labels (eyes_state/*,
+# blinks/blinking, yawning/*) were CHECKED on 2026-11-18 against three real DMD drowsiness files
+# (gA/1, gA/5, gB/6, session s5): they exist with exactly these names and the parser read all
+# three with no unknown label. The driver_actions/* and gaze_on_road/* names (distraction and gaze
+# subsets) are still UNVERIFIED: written from memory, not yet downloaded. Labels that exist in DMD but are missing here are reported as
+# "unknown" by the parser, never guessed. After the download:
+#   1. dump the real label vocabulary and interval counts (11_implementation_analysis 3.2),
+#   2. fix the names and add the missing ones here, after agreeing the mapping with the guide,
+#   3. set `status: verified` only on labels that were checked against the files.
+#
+# Fields per label:
+#   class  - contract class this label is evidence for (normal, drowsy, distracted) or null.
+#            DMD has no vehicle motion, so nothing maps to aggressive.
+#   event  - contract event type its intervals form (rules under `events:`), or null.
+#   status - UNVERIFIED or verified.
+#   note   - why, and what to check.
+# A label with class null and event null is known and deliberately ignored (reported as ignored).
+#
+# Resolution rules (fixed in code, see dmd.py): per frame a non-normal class beats normal, two
+# different non-normal classes give -1 (conflict); per 10 Hz step the majority over its frames.
+
+status: "proposal, to review with the guide (drowsiness labels verified on 3 files; others UNVERIFIED)"
+version: 0.1-proposal
+
+labels:
+  # --- distraction subset: driver actions (UNVERIFIED names) ---
+  "driver_actions/safe_drive":
+    {class: normal, event: null, status: UNVERIFIED, note: "the normal-driving label"}
+  "driver_actions/texting_right":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "manual + visual"}
+  "driver_actions/texting_left":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "manual + visual"}
+  "driver_actions/phonecall_right":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "hand-held call"}
+  "driver_actions/phonecall_left":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "hand-held call"}
+  "driver_actions/radio":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "operating the radio"}
+  "driver_actions/drinking":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "manual"}
+  "driver_actions/reach_side":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "manual + visual"}
+  "driver_actions/reach_backseat":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "manual + visual"}
+  "driver_actions/hair_and_makeup":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED, note: "manual + visual"}
+  "driver_actions/talking_to_passenger":
+    {class: distracted, event: distraction_episode, status: UNVERIFIED,
+     note: "REVIEW: cognitive, maybe visual; could also be treated as normal"}
+  "driver_actions/change_gear":
+    {class: null, event: null, status: UNVERIFIED,
+     note: "REVIEW: a normal driving task with one hand off the wheel; ignored for now"}
+  "driver_actions/standstill_or_waiting":
+    {class: null, event: null, status: UNVERIFIED, note: "car not moving; no class evidence"}
+  "driver_actions/unclassified":
+    {class: null, event: null, status: UNVERIFIED, note: "no class evidence"}
+
+  # --- drowsiness subset (UNVERIFIED names) ---
+  "eyes_state/open":
+    {class: null, event: null, status: verified, note: "open eyes alone say nothing"}
+  "eyes_state/close":
+    {class: null, event: micro_sleep, status: verified,
+     note: "closures of 1-3 s become micro_sleep (and drowsy steps); blinks are rejected by length"}
+  "eyes_state/opening":
+    {class: null, event: null, status: verified, note: "REVIEW: part of a closure or not?"}
+  "eyes_state/closing":
+    {class: null, event: null, status: verified, note: "REVIEW: part of a closure or not?"}
+  "eyes_state/undefined":
+    {class: null, event: null, status: verified, note: "no class evidence"}
+  "blinks/blinking":
+    {class: null, event: null, status: verified, note: "normal blinks; no class evidence"}
+  "yawning/Yawning with hand":
+    {class: drowsy, event: null, status: verified, note: "yawning is a drowsiness sign (03 5.1)"}
+  "yawning/Yawning without hand":
+    {class: drowsy, event: null, status: verified, note: "yawning is a drowsiness sign (03 5.1)"}
+
+  # --- gaze (UNVERIFIED names) ---
+  "gaze_on_road/looking_road":
+    {class: null, event: null, status: UNVERIFIED, note: "no class evidence on its own"}
+  "gaze_on_road/not_looking_road":
+    {class: null, event: distraction_episode, status: UNVERIFIED,
+     note: "only long off-road gaze counts (min_s below); mirror checks must not be distraction"}
+
+# Event rules: runs of frames of one event type (from all labels mapping to it), gaps of up to
+# merge_gap_s bridged, kept if min_s <= duration < max_s (max_s null = no upper bound).
+# Rejected runs are reported by the parser, not dropped silently.
+events:
+  micro_sleep:
+    min_s: 1.0                # contract 5.2: eyes closed >= 1.0 s and < 3 s
+    max_s: 3.0
+    merge_gap_s: 0.0
+  distraction_episode:
+    min_s: 2.0                # PROPOSAL: contract 5.2 says "beyond a threshold" with no value
+    max_s: null
+    merge_gap_s: 0.5          # PROPOSAL: bridges label hand-overs inside one episode
+
+# A kept event adds class evidence for its frames (so a 1.5 s closure labels its steps drowsy,
+# and a long off-road gaze labels its steps distracted).
+event_classes:
+  micro_sleep: drowsy
+  distraction_episode: distracted

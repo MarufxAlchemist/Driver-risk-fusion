@@ -1,0 +1,20 @@
+# Synthetic stub trips (docs/03_data_contract.md section 9). Not real data.
+seed: 0
+start_date: "20261101"         # dates in stub trip_ids
+duration_s: [120, 240]         # trip length range, seconds
+segment_s: [10, 40]            # behaviour segment length range, seconds
+class_probs:                   # per dataset, over CLASSES (normal, aggressive, drowsy, distracted)
+  uah: [0.5, 0.25, 0.25, 0.0]  # UAH has no distraction class
+  dmd: [0.5, 0.0, 0.25, 0.25]  # DMD has no vehicle motion, so no aggressive class
+  own: [0.4, 0.2, 0.2, 0.2]
+dropout:                       # random availability gaps per modality
+  start_prob: 0.01             # chance per step that a gap starts
+  length_s: [0.5, 3.0]
+low_conf_prob: 0.02            # face visible but confidence below threshold
+lane_detect_prob: 0.8          # UAH steps with a valid lane_offset
+unlabeled_prob: 0.1            # segments left unlabeled (y_cls = -1)
+datasets:                      # trips per dataset and drivers to draw from
+  uah: {n_trips: 5, n_drivers: 3, pairing: motion_only}
+  dmd: {n_trips: 5, n_drivers: 3, pairing: vision_only}
+  own: {n_trips: 8, n_drivers: 4, pairing: paired}
+split_fractions: {train: 0.5, val: 0.25, test: 0.25}

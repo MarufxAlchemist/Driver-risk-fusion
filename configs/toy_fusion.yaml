@@ -1,0 +1,16 @@
+# Toy fusion run on stub data (P0-C4). Proves the data path and that loss drops on the
+# stub toy rule. Its numbers say nothing about real performance.
+seed: 0
+data:
+  datasets: [uah, dmd, own]    # stub dataset folders under the stub root
+model:
+  d_model: 32
+  n_heads: 4
+  dropout: 0.1
+  modality_dropout_p: 0.15     # 02 section 4.3 default
+train:
+  epochs: 3
+  batch_size: 64
+  lr: 1.0e-3                   # 04 section 6 default for feature models
+  weight_decay: 1.0e-2
+  num_workers: 0

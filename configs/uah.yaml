@@ -1,0 +1,127 @@
+# UAH-DriveSet loader (src/driverisk/data/uah.py, P1-B1; docs/03_data_contract.md section 4.4).
+#
+# STATUS: CHECKED AGAINST THE REAL DOWNLOAD on 2026-11-18 (all 40 routes, 6 drivers), except the
+# entries still marked UNVERIFIED. Findings that changed this file (see docs/PROGRESS.md):
+#   * RAW_GPS has 12 columns, not 9 (the first 9 are as listed; the last three are 0 0 0);
+#   * lane detector states 1 and 2 are detections, 0 / -1 / -9 are not (not only 2);
+#   * the accelerometer yaw column is phone attitude (span about 3 deg per trip), not a heading;
+#   * folder names may carry a digit after the behaviour (NORMAL1, NORMAL2).
+# The loader checks every column count when it reads a file and stops with a clear error when a
+# real file differs.
+version: 0.2-checked-on-real-data
+
+# File kinds are found by name prefix (case-insensitive), the same prefixes as
+# driverisk.data.uah_inspect.FILE_PREFIXES. More than one match in a route folder is an error.
+files:
+  acc:
+    prefix: RAW_ACC
+    required: true
+    # VERIFIED on all 40 files: 11 columns (docs/11 was right; docs/human_tasks said 12).
+    n_cols: 11
+    columns:          # 0-based column index
+      t: 0            # timestamp, s
+      active: 1       # UNVERIFIED: "system activated" flag (speed above 50 km/h); not used
+      ax_raw: 2       # G  (the paper: X, Y lateral, Z longitudinal)
+      ay_raw: 3
+      az_raw: 4
+      ax_kf: 5        # Kalman-filtered X/Y/Z, G (UNVERIFIED order)
+      ay_kf: 6
+      az_kf: 7
+      roll: 8         # deg
+      pitch: 9        # deg
+      yaw: 10         # deg
+  gps:
+    prefix: RAW_GPS
+    required: true
+    n_cols: 12        # VERIFIED: 12 columns in all 40 files (the docs said 9); columns 9-11 unused
+    columns:
+      t: 0
+      speed_kmh: 1    # km/h (paper)
+      lat: 2          # order from here on matches the sample rows (40.5 N, -3.36 E near Madrid)
+      lon: 3
+      alt: 4
+      vert_accuracy: 5
+      horiz_accuracy: 6
+      course: 7       # deg; assumed clockwise like a compass (UNVERIFIED)
+      difcourse: 8
+  lane:
+    prefix: PROC_LANE
+    required: false   # without it lane_offset and lateral_drift_5s are NaN (and declared)
+    n_cols: 5         # VERIFIED count (5 in all 40 files); order matches the sample rows
+    columns:
+      t: 0
+      x_offset_m: 1   # car position relative to the lane centre, m (paper: "X")
+      phi_deg: 2
+      road_width_m: 3
+      state: 4        # detector state; see lane.valid_states below
+  inertial:
+    prefix: EVENTS_INERTIAL
+    required: false   # missing file = no events, recorded in meta
+    n_cols: 6         # VERIFIED count (6 in the files that have events)
+    columns:
+      t: 0
+      type: 1         # 1 braking, 2 turning, 3 acceleration (VERIFIED by the sign of the Z axis
+                      # around the events: negative in 100% of type 1, positive in 87% of type 3)
+      level: 2        # 1 low, 2 medium, 3 high (paper; UNVERIFIED meaning)
+      lat: 3
+      lon: 4
+      date: 5
+
+# Real files repeat a timestamp in a few rows (4-5 start-up rows per file with active = 0, 150
+# rows over the 40 accelerometer files, plus one mid-file repeat). One row of each
+# timestamp is kept (the last: the start-up rows come first and are still settling) and the
+# number dropped is written to each trip's meta.
+timestamps:
+  max_dropped_fraction: 0.01   # above this share of rows it is not the expected quirk: error
+  max_backwards_s: 1.0         # a jump back by more than this is an error
+
+# Rows that are not all-numeric are an error, except this many leading lines (headers).
+skip_header_lines: 0
+
+# Acceleration: which triple to use, unit factor, and the axis map into the contract frame
+# (x forward, y left, z up). `src` names a column key above; `sign` is +1 or -1.
+acceleration:
+  source: raw         # raw | kf (Kalman-filtered)
+  g_to_mps2: 9.80665
+  axes:
+    long: {src: z, sign: 1}   # VERIFIED: Z longitudinal, + forward (braking events: Z < 0)
+    lat: {src: y, sign: 1}    # Y is lateral (largest at turn events); LEFT/RIGHT SIGN UNVERIFIED
+    vert: {src: x, sign: 1}   # UNVERIFIED: X is not longitudinal (negative at every event type)
+  # VERIFIED: no gravity in any channel (median of every axis is within 0.04 G of 0 on all 40
+  # trips; the largest |value| is 0.66 G). The loader still checks this and fails loudly.
+  gravity_in_vertical: false
+  max_abs_g: 4.0      # any |raw value| above this means the file is not in G: loud error
+
+# Attitude angles from the file, deg. VERIFIED: the "yaw" column varies by only about 3 deg over a
+# whole route (median span 3.3, max 6.3), so it is the phone's attitude, not a heading, and a
+# yaw rate computed from it would be noise. yaw_source `none` leaves m_yaw_rate NaN (declared in
+# meta); the turn rate is heading_rate from the GPS course. `file` differentiates the column
+# (for a dataset whose yaw is a heading; yaw_sign then must make it left-positive).
+attitude:
+  roll_sign: 1
+  pitch_sign: 1
+  yaw_sign: 1
+  yaw_source: none
+
+speed:
+  kmh_to_mps: 0.2777777777777778   # 1 / 3.6
+  max_kmh: 250.0                   # a value above this is a units error: loud error
+
+lane:
+  # VERIFIED on 40 trips (state counts 2: 640k rows, 1: 59k, 0: 23k, -1: 9k, -9: 5k): states 1 and
+  # 2 carry real offsets (98% non-zero); 0 and -1 force the offset to 0 and -9 sets it to -9.
+  # Which of 1 / 2 is "high confidence" is not known; both are kept.
+  valid_states: [1, 2]
+  max_abs_offset_m: 5.0   # contract range of m_lane_offset; larger values are dropped (NaN)
+
+inertial_events:
+  min_speed_kmh: 50.0     # paper: only above 50 km/h (contract 4.4); seen: events at 34-142 km/h GPS speed
+  duration_s: 0.0         # the file gives one time per event; offset = onset + this
+  min_level: 1            # keep levels >= this (1 keeps all); OPEN QUESTION for the guide
+  type_map:               # UAH code -> contract event type
+    1: harsh_brake
+    2: sharp_turn
+    3: harsh_accel
+
+source_version: "UAH-DriveSet (version not yet read from the download)"
+vehicle_id: unknown       # the paper says one vehicle per driver; not in the folder name
