@@ -15,8 +15,8 @@ Claude does not download datasets by guessing URLs. You download; then the scrip
 | Drivers | D1-D6 | |
 | Trips | 3 motorway + 4 secondary per driver (D6: 3 + 2), about 40 | |
 | Behaviours | normal, drowsy, aggressive | |
-| Accelerometer rate | 10 Hz, 12 columns incl. timestamp | |
-| GPS rate / columns | 1 Hz, 9 columns | |
+| Accelerometer rate | 10 Hz, **11** columns incl. timestamp (checked 2026-11-18; this table said 12) | 10 Hz, 11 |
+| GPS rate / columns | 1 Hz, **12** columns (checked; this table said 9) | 1 Hz, 12 |
 | Folder name format parsed | all folders | |
 | Video | one file per trip, road view | |
 | Events file | only above 50 km/h | |
