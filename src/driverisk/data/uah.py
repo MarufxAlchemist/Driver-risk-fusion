@@ -16,8 +16,12 @@ Conversion (contract 4.4):
   each with a configurable sign. The data is vehicle-aligned, so the phone alignment estimation
   of `features.motion` is NOT run (`motion.vehicle_frame_alignment`).
 * GPS speed km/h -> m/s; speed and heading rate are held from the latest fix (assumption A19).
-* yaw_rate = d(unwrap(yaw))/dt; roll and pitch are taken from the file (latest sample per step).
-* lane_offset = lane-detector offset where the detector state is "detected", else NaN (the latest
+* yaw_rate: the real file's yaw column is the PHONE ATTITUDE (it moves about 3 deg per trip),
+  not a heading, so it is NOT differentiated: yaw_rate is NaN (declared), and the turn rate is
+  `heading_rate` from the GPS course. `attitude.yaw_source: file` switches the old rule back on
+  for a dataset whose yaw column is a heading. Roll and pitch come from the file.
+* lane_offset = lane-detector offset where the detector state is one of `lane.valid_states`
+  (real file: 1 and 2 carry offsets; 0, -1 and -9 mean no detection), else NaN (the latest
   sample per step decides); lateral_drift_5s = its rolling std over 5 s.
 * inertial events (braking / turning / acceleration) become harsh_brake / sharp_turn /
   harsh_accel with `source: "uah_inertial"`. They are logged only above 50 km/h, so events at a
@@ -31,6 +35,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -53,16 +58,15 @@ _EXTRACTOR = "driverisk.data.uah"
 # Assumptions this loader makes that nobody has checked on the real files. Written into every
 # trip's meta so the processed data carries its own caveat.
 UNVERIFIED = (
-    "folder name format Date-Distance(km)-Driver-Behavior-Road (uah_inspect.FOLDER_RE)",
-    "file name prefixes RAW_ACC, RAW_GPS, PROC_LANE, EVENTS_INERTIAL",
-    "column counts and orders in configs/uah.yaml",
-    "accelerations in G, vehicle-aligned; Z longitudinal, Y lateral, X vertical; axis signs",
-    "whether the vertical channel contains gravity",
-    "GPS speed in km/h; course in degrees clockwise",
-    "roll/pitch/yaw in degrees; yaw sign (must be left-positive)",
-    "lane detector offset in metres and state code 2 = detected",
-    "inertial event codes (1 brake, 2 turn, 3 accel) and levels (1-3)",
-    "inertial events logged only above 50 km/h",
+    # Checked on the real download (2026-11-18): folder names, file prefixes, column counts, G
+    # units without gravity, Z = longitudinal with + forward, event codes 1 brake / 2 turn /
+    # 3 accel, lane states 1 and 2 = detected, yaw column = phone attitude, GPS in km/h.
+    # Still unchecked:
+    "sign of the lateral axis (Y): left positive?",
+    "X is vertical (only that it is not longitudinal was shown)",
+    "GPS course in degrees clockwise (compass)",
+    "the meaning of inertial event levels 1-3",
+    "inertial events logged only above 50 km/h (the paper says so; speeds seen: 34-142 km/h)",
     "timestamps in seconds, shared by all files of a route",
 )
 
@@ -77,8 +81,9 @@ class RouteInfo:
     timestamp: str  # YYYYMMDDhhmmss from the folder name
     distance_km: float
     driver_raw: str  # "D1"
-    behaviour: str  # upper case, e.g. "NORMAL"
+    behaviour: str  # upper case with the digit removed, e.g. "NORMAL" (folder says NORMAL1)
     road: str  # upper case, e.g. "MOTORWAY"
+    behaviour_raw: str = ""  # as in the folder name, e.g. "NORMAL1"
 
     @property
     def driver_id(self) -> str:
@@ -134,7 +139,10 @@ def parse_route_folder(folder: Path) -> RouteInfo:
             f"{folder}: folder name does not match Date-Distance(km)-Driver-Behavior-Road "
             f"({FOLDER_RE.pattern}); the format is from the paper and UNVERIFIED"
         )
-    return RouteInfo(folder, m[1], float(m[2]), m[3].upper(), m[4].upper(), m[5].upper())
+    raw = m[4].upper()
+    return RouteInfo(
+        folder, m[1], float(m[2]), m[3].upper(), re.sub(r"\d+$", "", raw), m[5].upper(), raw
+    )
 
 
 def find_route_folders(root: str | Path) -> list[Path]:
@@ -151,7 +159,11 @@ def find_route_file(folder: Path, kind: str, cfg: dict[str, Any]) -> Path | None
     """The one file of `kind` in `folder` by name prefix; error if several match."""
     spec = cfg["files"][kind]
     prefix = spec["prefix"].upper()
-    hits = sorted(p for p in folder.iterdir() if p.is_file() and p.name.upper().startswith(prefix))
+    hits = sorted(
+        p
+        for p in folder.iterdir()
+        if p.is_file() and p.name.upper().startswith(prefix) and not p.name.endswith("~")
+    )  # a trailing ~ is an editor backup, present in some real folders
     if len(hits) > 1:
         names = [p.name for p in hits]
         raise UAHFormatError(f"{folder}: more than one file starts with {prefix}: {names}")
@@ -162,8 +174,14 @@ def find_route_file(folder: Path, kind: str, cfg: dict[str, Any]) -> Path | None
     return hits[0]
 
 
-def read_numeric_table(path: Path, n_cols: int, skip_header_lines: int = 0) -> np.ndarray:
-    """Whitespace- or comma-separated numbers, exactly `n_cols` per row. Errors name the line."""
+def read_numeric_table(
+    path: Path, n_cols: int, skip_header_lines: int = 0, allow_empty: bool = False
+) -> np.ndarray:
+    """Whitespace- or comma-separated numbers, exactly `n_cols` per row. Errors name the line.
+
+    `allow_empty` returns a table with no rows for a file without data (a zero-byte events file
+    means "no events").
+    """
     rows: list[list[float]] = []
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     for lineno, line in enumerate(lines, start=1):
@@ -183,6 +201,8 @@ def read_numeric_table(path: Path, n_cols: int, skip_header_lines: int = 0) -> n
             )
         rows.append(values)
     if not rows:
+        if allow_empty:
+            return np.zeros((0, n_cols))
         raise UAHFormatError(f"{path.name}: no data rows")
     table = np.asarray(rows, dtype=np.float64)
     if not np.isfinite(table).all():
@@ -190,21 +210,64 @@ def read_numeric_table(path: Path, n_cols: int, skip_header_lines: int = 0) -> n
     return table
 
 
-def _load(folder: Path, kind: str, cfg: dict[str, Any]) -> tuple[Path, dict[str, np.ndarray]]:
+def _load(
+    folder: Path, kind: str, cfg: dict[str, Any]
+) -> tuple[Path, dict[str, np.ndarray], dict[str, int]]:
+    """Read one file; returns (path, columns, counts of rows removed).
+
+    Quirks of the real files, all handled explicitly and reported in the trip meta:
+    * a few rows share one timestamp (4-5 start-up rows per file with `active` = 0, sometimes one
+      mid-file): of the differenced files (accelerometer, GPS) only the LAST row of each
+      timestamp is kept, because the start-up rows come first and are still settling;
+    * one file (D6 DROWSY-MOTORWAY) ends with an exact copy of its last ~10 s: exact duplicate
+      rows are removed before anything else;
+    * event and lane rows may be out of time order: they are sorted (stable);
+    * a zero-byte events file means no events.
+    More than `timestamps.max_dropped_fraction` of the rows, or a jump back of more than
+    `timestamps.max_backwards_s` that is not an exact copy, is an error: a different file.
+    """
+    counts = {"non_increasing": 0, "exact_duplicates": 0}
     path = find_route_file(folder, kind, cfg)
     if path is None:
-        return Path(), {}
+        return Path(), {}, counts
     spec = cfg["files"][kind]
-    table = read_numeric_table(path, int(spec["n_cols"]), int(cfg.get("skip_header_lines", 0)))
+    table = read_numeric_table(
+        path, int(spec["n_cols"]), int(cfg.get("skip_header_lines", 0)),
+        allow_empty=kind == "inertial",
+    )  # fmt: skip
+    if len(table):
+        _, first = np.unique(table, axis=0, return_index=True)
+        unique = np.zeros(len(table), dtype=bool)
+        unique[first] = True
+        counts["exact_duplicates"] = int((~unique).sum())
+        table = table[unique]
+    t = table[:, int(spec["columns"]["t"])]
+    d = np.diff(t)
+    if kind in ("acc", "gps"):  # these are differenced and searched
+        t_cfg = cfg["timestamps"]
+        jump = d < -t_cfg["max_backwards_s"]
+        if jump.any():
+            raise UAHFormatError(
+                f"{path.name}: timestamp jumps back by more than {t_cfg['max_backwards_s']} s "
+                f"(first at data row {int(np.argmax(jump)) + 2}) and the rows are not an exact "
+                "copy of earlier ones"
+            )
+        keep = np.r_[d > 0, True]  # a row is dropped when the next one has the same time or less
+        t_kept = t[keep]
+        again = t_kept > np.r_[-np.inf, np.maximum.accumulate(t_kept)[:-1]]  # still backwards
+        keep[np.flatnonzero(keep)[~again]] = False
+        counts["non_increasing"] = int((~keep).sum())
+        if counts["non_increasing"] > t_cfg["max_dropped_fraction"] * len(t):
+            raise UAHFormatError(
+                f"{path.name}: {counts['non_increasing']} of {len(t)} rows have a repeated or "
+                f"backwards timestamp (limit {t_cfg['max_dropped_fraction']:.0%}); not the "
+                "expected quirk"
+            )
+        table = table[keep]
+    elif (d < 0).any():
+        table = table[np.argsort(t, kind="stable")]  # events / lane rows out of order
     cols = {name: table[:, int(i)] for name, i in spec["columns"].items()}
-    d = np.diff(cols["t"])
-    strict = kind in ("acc", "gps")  # these are differenced and searched; the others are binned
-    bad = (d <= 0) if strict else (d < 0)
-    if bad.any():
-        first = int(np.argmax(bad)) + 2
-        order = "strictly increasing" if strict else "non-decreasing"
-        raise UAHFormatError(f"{path.name}: timestamps not {order} (first at data row {first})")
-    return path, cols
+    return path, cols, counts
 
 
 # --- conversion -----------------------------------------------------------------------------
@@ -326,10 +389,10 @@ def convert_route(
             f"{folder.name}: behaviour {route.behaviour} not in configs/label_map_uah.yaml "
             f"({sorted(label_map)})"
         )
-    acc_path, acc = _load(folder, "acc", cfg)
-    gps_path, gps = _load(folder, "gps", cfg)
-    lane_path, lane = _load(folder, "lane", cfg)
-    ev_path, ev = _load(folder, "inertial", cfg)
+    acc_path, acc, acc_dropped = _load(folder, "acc", cfg)
+    gps_path, gps, gps_dropped = _load(folder, "gps", cfg)
+    lane_path, lane, _ = _load(folder, "lane", cfg)
+    ev_path, ev, _ = _load(folder, "inertial", cfg)
 
     t0 = float(acc["t"][0])
     t_acc, t_gps = acc["t"] - t0, gps["t"] - t0
@@ -350,7 +413,7 @@ def convert_route(
     result = M.extract_motion_features(
         t_acc, veh, t_fix, kmh * s_cfg["kmh_to_mps"],
         heading_deg=course,
-        yaw_deg=(t_acc, att["yaw_sign"] * acc["yaw"]),
+        yaw_deg=(t_acc, att["yaw_sign"] * acc["yaw"]) if att.get("yaw_source") == "file" else None,
         lane_offset=(np.array([]), np.array([])),  # filled below with the detector rule
         alignment=M.vehicle_frame_alignment(gravity_included=gravity),
     )  # fmt: skip
@@ -365,7 +428,7 @@ def convert_route(
     l_cfg = cfg["lane"]
     n_lane_too_far = 0
     if lane:
-        x = np.where(lane["state"] == l_cfg["valid_state"], lane["x_offset_m"], np.nan)
+        x = np.where(np.isin(lane["state"], l_cfg["valid_states"]), lane["x_offset_m"], np.nan)
         too_far = np.abs(x) > l_cfg["max_abs_offset_m"]
         n_lane_too_far = int(too_far.sum())
         x[too_far] = np.nan
@@ -411,11 +474,17 @@ def convert_route(
         "extractor_versions": {"uah_loader": _EXTRACTOR, "uah_config": cfg.get("version")},
         "notes": (
             "UAH-DriveSet route converted by driverisk.data.uah against the documented format; "
-            "the format is UNVERIFIED until scripts/inspect_uah.py has run on the download. "
+            "checked on the real download on 2026-11-18, see UNVERIFIED for what is still open. "
             "Motion only (no driver camera). Inertial events are logged only above 50 km/h: "
             "outside inertial_events.logged_segments_s their absence means 'not logged'. "
-            "y_cls is the trip-level behaviour."
+            "y_cls is the trip-level behaviour. yaw_rate is NaN: the yaw column is phone attitude."
         ),
+        "timestamps": {
+            "acc_rows_dropped_non_increasing": acc_dropped["non_increasing"],
+            "acc_rows_dropped_exact_duplicates": acc_dropped["exact_duplicates"],
+            "gps_rows_dropped_non_increasing": gps_dropped["non_increasing"],
+            "gps_rows_dropped_exact_duplicates": gps_dropped["exact_duplicates"],
+        },
         S.META_ALL_NAN_KEY: all_nan,
         "events_annotated": bool(ev),
         "pairing": "motion_only",
@@ -423,6 +492,7 @@ def convert_route(
             "folder": folder.name,
             "driver": route.driver_raw,
             "behaviour": route.behaviour,
+            "behaviour_raw": route.behaviour_raw,
             "road": route.road,
             "distance_km": route.distance_km,
             "start": route.timestamp,

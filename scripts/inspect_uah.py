@@ -16,10 +16,10 @@ import numpy as np
 from driverisk.data.uah_inspect import inspect_dataset
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("root", type=Path)
-    args = p.parse_args()
+    args = p.parse_args(argv)
     if not args.root.is_dir():
         print(f"{args.root} is not a folder. Download UAH-DriveSet first (docs/human_tasks).")
         return 2
@@ -48,6 +48,9 @@ def main() -> int:
             continue
         rates = [f.median_rate_hz for f in files if np.isfinite(f.median_rate_hz)]
         cols = Counter(f.n_cols for f in files)
+        if not rates:  # e.g. the OpenStreetMap file is text: nothing numeric to measure
+            print(f"{key:<9}: {len(files)} files, columns {dict(cols)}, no numeric rows (no rate)")
+            continue
         print(
             f"{key:<9}: {len(files)} files, columns {dict(cols)}, median rate "
             f"{np.median(rates):.1f} Hz (min {min(rates):.1f}, max {max(rates):.1f})"

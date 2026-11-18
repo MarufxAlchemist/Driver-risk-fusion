@@ -1,15 +1,19 @@
 """UAH-DriveSet loader (P1-B1) on a synthetic UAH-like tree whose answers are known exactly.
 
-The real download has not been seen, so the tree follows the layout the repo docs record from
-the paper (route folder name format, file prefixes, the column map in configs/uah.yaml). These
-tests prove the conversion maths and the loud failures; they cannot prove the real format.
+The tree is modelled on the REAL download, which was inspected on 2026-11-18 (docs/PROGRESS.md):
+folder names with a digit after the behaviour (NORMAL1), a 12-column RAW_GPS, lane-detector state
+codes 1 and 2 = detected and 0, -1, -9 = not detected, and a yaw column that is phone attitude
+(it barely moves), not a heading. The values are synthetic, so these tests prove the conversion
+maths and the loud failures, not the real file contents.
 
 Every synthetic route lasts 60 s (raw timestamps start at 1000 s to test the t0 shift):
 - accelerometer at 10 Hz, in G: braking of 0.3 G on Z for 20 <= t < 23 s, lateral 0.2 G on Y
-  for 30 <= t < 32 s, vertical X = 0; roll 2 deg, pitch -1.5 deg, yaw a +10 deg/s ramp from
-  170 deg (crosses 180 deg at t = 1 s and wraps several times)
-- GPS at 1 Hz at t = 0.5, 1.5, ...: 90 km/h before 40 s, 30 km/h after; course constant
-- lane detection at 20 Hz: offset 0.3 sin(2 pi t / 10) m, detector state 1 (lost) for 10-12 s
+  for 30 <= t < 32 s, vertical X = 0; roll 2 deg, pitch -1.5 deg, yaw constant 0.3 deg
+- GPS (12 columns) at 1 Hz at t = 0.5, 1.5, ...: 90 km/h before 40 s, 30 km/h after; course
+  constant
+- lane detection at 20 Hz: offset 0.3 sin(2 pi t / 10) m, detector state 2; state 0 (offset
+  forced to 0) for 10-12 s, state 1 (low confidence, offset valid) for 14-16 s, state -9
+  (offset -9) for 18-19 s
 - inertial events: braking at 20.5 s (90 km/h), turning at 31 s (90 km/h), acceleration at
   45 s (30 km/h, below the 50 km/h logging limit, so it must be dropped)
 """
@@ -37,15 +41,11 @@ ROUTES = {
     # folder name: (driver id, trip id)
     "20151111123124-25km-D1-NORMAL-MOTORWAY": ("d01", "uah_d01_20151111_01"),
     "20151111134545-16km-D1-AGGRESSIVE-SECONDARY": ("d01", "uah_d01_20151111_02"),
-    "20151120160000-25km-D2-NORMAL-MOTORWAY": ("d02", "uah_d02_20151120_01"),
+    "20151120160000-25km-D2-NORMAL1-SECONDARY": ("d02", "uah_d02_20151120_01"),
     "20151121093000-25km-D2-AGGRESSIVE-MOTORWAY": ("d02", "uah_d02_20151121_01"),
 }
 EVENTS_AGGRESSIVE = [(20.5, 1, 2), (31.0, 2, 3), (45.0, 3, 1)]  # (t, type, level)
 EVENTS_NORMAL = [(20.5, 1, 1)]
-
-
-def _wrap180(deg: np.ndarray) -> np.ndarray:
-    return (deg + 180.0) % 360.0 - 180.0
 
 
 def _acc_table(n_cols: int = 11) -> np.ndarray:
@@ -55,7 +55,7 @@ def _acc_table(n_cols: int = 11) -> np.ndarray:
     az = np.where((t >= 20) & (t < 23), -0.3, 0.0)
     cols = [
         T0 + t, np.ones_like(t), ax, ay, az, ax, ay, az,
-        np.full_like(t, 2.0), np.full_like(t, -1.5), _wrap180(170.0 + 10.0 * t),
+        np.full_like(t, 2.0), np.full_like(t, -1.5), np.full_like(t, 0.3),
     ]  # fmt: skip
     return np.column_stack(cols[:n_cols])
 
@@ -64,13 +64,19 @@ def _gps_table() -> np.ndarray:
     t = np.arange(0.5, DURATION, 1.0)
     speed = np.where(t < 40, 90.0, 30.0)
     z = np.zeros_like(t)
-    return np.column_stack([T0 + t, speed, z + 40.4, z - 3.6, z + 600, z + 5, z + 5, z + 90, z])
+    # real file: t, speed, lat, lon, alt, vert acc, horiz acc, course, difcourse, then 0 0 0
+    return np.column_stack([T0 + t, speed, z + 40.4, z - 3.6, z + 600, z + 5, z + 5, z + 90, z,
+                            z, z, z])  # fmt: skip
 
 
 def _lane_table() -> np.ndarray:
     t = np.round(np.arange(0.0, DURATION, 0.05), 6)
     x = 0.3 * np.sin(2 * np.pi * t / 10.0)
-    state = np.where((t >= 10) & (t < 12), 1.0, 2.0)
+    state = np.full_like(t, 2.0)
+    state[(t >= 10) & (t < 12)] = 0.0
+    state[(t >= 14) & (t < 16)] = 1.0
+    state[(t >= 18) & (t < 19)] = -9.0
+    x = np.where(state == 0, 0.0, np.where(state == -9, -9.0, x))  # what the real file holds
     return np.column_stack([T0 + t, x, np.zeros_like(t), np.full_like(t, 3.5), state])
 
 
@@ -131,6 +137,14 @@ def test_parse_route_folder_and_driver_token(tree: Path) -> None:
     assert (r.driver_raw, r.driver_id, r.behaviour, r.road) == ("D1", "d01", "AGGRESSIVE",
                                                                 "SECONDARY")  # fmt: skip
     assert r.day == "20151111" and r.timestamp == "20151111134545" and r.distance_km == 16.0
+
+
+def test_digit_suffix_on_the_behaviour_is_the_same_behaviour(tree: Path) -> None:
+    """Real folders are named ...-D2-NORMAL1-SECONDARY and ...-D2-NORMAL2-SECONDARY."""
+    r = U.parse_route_folder(next(tree.rglob("20151120160000*")))
+    assert r.behaviour == "NORMAL" and r.behaviour_raw == "NORMAL1" and r.road == "SECONDARY"
+    r2 = U.parse_route_folder(Path("20151110180824-16km-D1-NORMAL2-SECONDARY"))
+    assert (r2.behaviour, r2.behaviour_raw) == ("NORMAL", "NORMAL2")
 
 
 def test_unparseable_folder_name_fails_loudly(tmp_path: Path) -> None:
@@ -198,11 +212,14 @@ def test_speed_kmh_to_mps_and_held_causally(aggressive: U.UAHTrip) -> None:
     assert (_rows(f, 0.5, 59.9)["m_gps_valid"] == 1).all()
 
 
-def test_yaw_rate_from_unwrapped_yaw_across_180(aggressive: U.UAHTrip) -> None:
-    rate = aggressive.frame["m_yaw_rate"].to_numpy(np.float64)
-    finite = rate[np.isfinite(rate)]
-    assert len(finite) >= len(rate) - 1
-    assert finite == pytest.approx(10.0, abs=1e-3)  # no +-3600 deg/s spike at the wrap
+def test_yaw_column_is_phone_attitude_so_yaw_rate_is_not_taken_from_it(
+    aggressive: U.UAHTrip,
+) -> None:
+    """Real UAH: the yaw column spans ~3 deg per trip, so its derivative is noise, not a turn
+    rate. yaw_rate is NaN (declared); the turn information is heading_rate from the GPS course."""
+    assert aggressive.frame["m_yaw_rate"].isna().all()
+    assert "m_yaw_rate" in aggressive.meta[S.META_ALL_NAN_KEY]
+    assert "yaw" in json.dumps(aggressive.meta["notes"]).lower()
 
 
 def test_roll_and_pitch_come_from_the_file(aggressive: U.UAHTrip) -> None:
@@ -212,22 +229,23 @@ def test_roll_and_pitch_come_from_the_file(aggressive: U.UAHTrip) -> None:
 
 def test_axis_signs_are_configurable(tree: Path, cfg: dict, label_map: dict) -> None:
     cfg["acceleration"]["axes"]["long"]["sign"] = -1
-    cfg["attitude"]["yaw_sign"] = -1
     trip = U.convert_route(next(tree.rglob("20151111134545*")), "uah_d01_20151111_02", cfg,
                            label_map)  # fmt: skip
     brake = _rows(trip.frame, 20.0 - 0.05, 23.0 - 0.05)["m_acc_long"].to_numpy()
     assert brake == pytest.approx(0.3 * G, abs=1e-5)
-    assert np.nanmean(trip.frame["m_yaw_rate"]) == pytest.approx(-10.0, abs=1e-3)
 
 
 def test_lane_offset_and_drift_from_lane_detection(aggressive: U.UAHTrip) -> None:
     f = aggressive.frame
     t = f[S.COL_T].to_numpy(np.float64)
     lane = f["m_lane_offset"].to_numpy(np.float64)
-    # detector state != 2 from 10.0 s to 11.95 s; the latest sample of a step decides, so the
-    # step t = 10.0 (samples 9.95 valid, 10.0 lost) is already NaN and t = 12.0 is valid again
-    lost = (t > 10.0 - 1e-6) & (t < 12.0 - 1e-6)
+    # state 0 (10.0-11.95 s) and state -9 (18.0-18.95 s) mean "no detection": NaN. The latest
+    # sample of a step decides, so step t = 10.0 is already NaN and t = 12.0 is valid again.
+    # State 1 (14-16 s) is a low-confidence DETECTION with a real offset: it must be kept.
+    lost = ((t > 10.0 - 1e-6) & (t < 12.0 - 1e-6)) | ((t > 18.0 - 1e-6) & (t < 19.0 - 1e-6))
     assert np.isnan(lane[lost]).all() and np.isfinite(lane[np.isclose(t, 12.0)]).all()
+    state1 = (t > 14.0) & (t < 16.0 - 1e-6)
+    assert np.isfinite(lane[state1]).all()
     ok = (t > 0.05) & ~lost & (t < 59.9)
     # the last lane sample of step k is at t_k (20 Hz samples at k*0.1 - 0.05 and k*0.1)
     expected = 0.3 * np.sin(2 * np.pi * t[ok] / 10.0)
@@ -452,3 +470,105 @@ def test_resample_last_is_causal() -> None:
     x[2] = np.nan  # step 1's latest sample is NaN: skipped by default, kept with keep_nan
     assert F.resample_last(t, x, 4)[1] == pytest.approx(2.0)
     assert np.isnan(F.resample_last(t, x, 4, keep_nan=True)[1])
+
+
+# --- found on the real download (2026-11-18) -------------------------------------------------
+def _with_duplicate_start(folder: Path, n_dup: int = 4) -> None:
+    """Real files start with a few samples that share a timestamp (system not yet active)."""
+    tab = np.loadtxt(folder / "RAW_ACCELEROMETERS.txt")
+    dup = np.repeat(tab[:1], n_dup, axis=0)
+    dup[:, 1] = 0.0  # active flag 0
+    dup[:, 2:5] += np.linspace(0.05, 0.2, n_dup)[:, None]  # unsettled values: must not be used
+    _save(folder / "RAW_ACCELEROMETERS.txt", np.vstack([dup, tab]))
+
+
+def test_repeated_timestamps_keep_the_last_row_and_are_counted(
+    tmp_path: Path, cfg: dict, label_map: dict
+) -> None:
+    clean = make_route(tmp_path / "a", "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    dup = make_route(tmp_path / "b", "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    _with_duplicate_start(dup)
+    ref = U.convert_route(clean, "uah_d01_20151111_01", cfg, label_map)
+    got = U.convert_route(dup, "uah_d01_20151111_01", cfg, label_map)
+    assert got.meta["timestamps"]["acc_rows_dropped_non_increasing"] == 4
+    assert ref.meta["timestamps"]["acc_rows_dropped_non_increasing"] == 0
+    pd.testing.assert_frame_equal(got.frame, ref.frame)  # the duplicates change nothing
+
+
+def test_a_large_jump_back_in_time_fails_loudly(tmp_path: Path, cfg: dict, label_map: dict) -> None:
+    folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    tab = np.loadtxt(folder / "RAW_ACCELEROMETERS.txt")
+    tab[300:, 0] -= 5.0  # the clock jumps back by 5 s half way
+    _save(folder / "RAW_ACCELEROMETERS.txt", tab)
+    with pytest.raises(U.UAHFormatError, match="back"):
+        U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
+
+
+def test_too_many_repeated_timestamps_fail_loudly(
+    tmp_path: Path, cfg: dict, label_map: dict
+) -> None:
+    folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    _with_duplicate_start(folder, n_dup=100)  # 100 of 700 rows
+    with pytest.raises(U.UAHFormatError, match="repeated"):
+        U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
+
+
+def test_editor_backup_files_are_ignored(tmp_path: Path, cfg: dict, label_map: dict) -> None:
+    """Some real folders hold EVENTS_INERTIAL.txt~ next to EVENTS_INERTIAL.txt."""
+    folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    _save(folder / "EVENTS_INERTIAL.txt~", _events_table(EVENTS_AGGRESSIVE))
+    trip = U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
+    assert len(trip.events) == 1  # from EVENTS_INERTIAL.txt, not the backup
+
+
+def test_config_matches_the_checked_real_format(cfg: dict) -> None:
+    assert cfg["files"]["acc"]["n_cols"] == 11 and cfg["files"]["gps"]["n_cols"] == 12
+    assert cfg["files"]["lane"]["n_cols"] == 5 and cfg["files"]["inertial"]["n_cols"] == 6
+    assert cfg["lane"]["valid_states"] == [1, 2]
+    assert cfg["attitude"]["yaw_source"] == "none"
+
+
+def test_an_exact_copy_of_the_final_block_is_removed_and_counted(
+    tmp_path: Path, cfg: dict, label_map: dict
+) -> None:
+    """Real D6 DROWSY-MOTORWAY: the last ~10 s of the accelerometer file appear twice."""
+    clean = make_route(tmp_path / "a", "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    dup = make_route(tmp_path / "b", "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    tab = np.loadtxt(dup / "RAW_ACCELEROMETERS.txt")
+    _save(dup / "RAW_ACCELEROMETERS.txt", np.vstack([tab, tab[-100:]]))  # 7 s copied again
+    ref = U.convert_route(clean, "uah_d01_20151111_01", cfg, label_map)
+    got = U.convert_route(dup, "uah_d01_20151111_01", cfg, label_map)
+    assert got.meta["timestamps"]["acc_rows_dropped_exact_duplicates"] == 100
+    pd.testing.assert_frame_equal(got.frame, ref.frame)
+
+
+def test_a_copied_block_with_different_values_still_fails_loudly(
+    tmp_path: Path, cfg: dict, label_map: dict
+) -> None:
+    folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    tab = np.loadtxt(folder / "RAW_ACCELEROMETERS.txt")
+    tail = tab[-100:].copy()
+    tail[:, 4] += 0.01  # same timestamps, different values: not a harmless copy
+    _save(folder / "RAW_ACCELEROMETERS.txt", np.vstack([tab, tail]))
+    with pytest.raises(U.UAHFormatError, match="back"):
+        U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
+
+
+def test_unsorted_event_rows_are_sorted_by_time(tmp_path: Path, cfg: dict, label_map: dict) -> None:
+    """Real D1 DROWSY-MOTORWAY lists an event at 477.89 s before one at 474.05 s."""
+    folder = make_route(tmp_path, "20151111134545-16km-D1-AGGRESSIVE-SECONDARY")
+    _save(folder / "EVENTS_INERTIAL.txt", _events_table([(31.0, 2, 3), (20.5, 1, 2)]))
+    trip = U.convert_route(folder, "uah_d01_20151111_02", cfg, label_map)
+    assert [e["type"] for e in trip.events] == ["harsh_brake", "sharp_turn"]
+    assert [e["onset_s"] for e in trip.events] == sorted(e["onset_s"] for e in trip.events)
+
+
+def test_an_empty_events_file_means_no_events_not_an_error(
+    tmp_path: Path, cfg: dict, label_map: dict
+) -> None:
+    """Real D4 NORMAL2-SECONDARY has a zero-byte EVENTS_INERTIAL.txt."""
+    folder = make_route(tmp_path, "20151111123124-25km-D1-NORMAL-MOTORWAY")
+    (folder / "EVENTS_INERTIAL.txt").write_text("", encoding="utf-8")
+    trip = U.convert_route(folder, "uah_d01_20151111_01", cfg, label_map)
+    assert trip.events == [] and trip.meta["events_annotated"] is True
+    assert validate_processed_dir  # imported; the dataset-level test below covers validation
