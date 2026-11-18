@@ -205,7 +205,7 @@ def test_perclos_is_nan_while_the_face_is_missing() -> None:
 def test_threshold_source_is_recorded_and_can_be_overridden() -> None:
     t, lm, mats = frames(30, ear_r=0.23, ear_l=0.23)
     default = V.extract_vision_features(t, lm, mats)
-    assert default.meta["ear_threshold"] == 0.21
+    assert default.meta["ear_threshold"] == V.load_vision_config()["ear_threshold"]
     assert default.meta["ear_threshold_source"] == "global_default"
     assert (col(default, "eye_closed")[1:] == 0).all()
     personal = V.extract_vision_features(t, lm, mats, ear_threshold=0.25)

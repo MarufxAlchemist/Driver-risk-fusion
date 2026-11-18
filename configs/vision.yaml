@@ -6,7 +6,13 @@
 # model evaluation (same rule as configs/events.yaml).
 version: 0.1-proposal
 
-ear_threshold: 0.21          # global default; a per-driver value replaces it after calibration (P4)
+# Global default; a per-driver value replaces it after calibration (P4). Was 0.21 (a generic
+# value). Checked on 2026-11-18 against the human eye-state annotation of 3 DMD drowsiness
+# sessions (11,738 labelled frames): F1 0.89 at 0.21, about 0.98 anywhere from 0.14 to 0.17;
+# 0.15 is the middle of that plateau. Subject gA_1's open eyes sit low (median EAR 0.25, 5th
+# percentile 0.19), so 0.21 gave 315 false closures there: the reason for calibration.
+# Caveat: only 3 subjects. Re-check on the DMD training drivers once the splits exist.
+ear_threshold: 0.15
 blink_max_s: 0.4             # a closure this short or shorter is a blink, longer is not
 perclos_min_history_s: 10.0  # PERCLOS is NaN until this much valid eye data is in the window
 face_conf_min: 0.5           # contract mask rule (must equal schema.FACE_CONF_MIN)

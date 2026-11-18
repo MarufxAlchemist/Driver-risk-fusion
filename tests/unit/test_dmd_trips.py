@@ -192,7 +192,8 @@ def test_micro_sleep_event_comes_from_the_annotation(trip: T.DmdTrip) -> None:
 
 def test_meta_carries_provenance_and_the_label_report(trip: T.DmdTrip) -> None:
     m = trip.meta
-    assert m["ear_threshold"] == 0.21 and m["ear_threshold_source"] == "global_default"
+    assert m["ear_threshold"] == V.load_vision_config()["ear_threshold"]
+    assert m["ear_threshold_source"] == "global_default"
     d = m["dmd"]
     assert (d["group"], d["subject"], d["session"]) == ("gA", 1, 5)
     assert d["annotation_type"] == "drowsiness" and d["video_fps"] == pytest.approx(FPS)

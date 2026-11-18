@@ -182,6 +182,17 @@ Left/right sign of the lateral axis (Y), that X is vertical (only that it is not
 - **Only 12-20% of steps get a class (all `drowsy`); the rest are unlabelled, and there is no `normal` at all.** The session s5 activities (safe driving, sleepy driving, microsleep) are not in the JSON. Micro-sleep events kept: 6 / 4 / 1; 22 / 26 / 12 closures were shorter than 1 s and rejected (blink-length).
 - **Decision needed (guide-level):** where does the `normal` class for DMD come from? Options: (a) take `normal` from the DMD **Distraction** set, whose `driver_actions/safe_drive` label is the normal-driving label (names still unverified until it is downloaded), and use the drowsiness sessions only as positive evidence; (b) label "eyes open, no closure, no yawn" stretches of the drowsiness sessions as normal, which risks calling early sleepy driving normal. I recommend (a).
 
+### DMD video -> features, run on the three real sessions (2026-11-18, later)
+`scripts/process_dmd.py` (library: `data/dmd_trips.py`) runs MediaPipe over the face videos (about 35 frames/s, 80-90 s per session, face found in 99.8-100% of frames), caches landmarks in `data/interim/dmd/`, builds contract trips and validates them: **3 trips, 0 validator errors** (`dmd_d01_20190314_01`, `dmd_d05_20190313_01`, `dmd_d06_20190313_01`; subject numbers run across groups, so `gB/6` is `d06`: assumption). Annotation frame counts equal the video's, except gA_1 (annotation 5481, video 5480).
+
+**First real validation of the vision features, against the human eye-state annotation (11,738 labelled frames):**
+- Annotation frame numbers line up with the face video: best shift 0 or -1 frame (no shift needed).
+- Annotated closed eyes read EAR 0.03-0.07, open eyes 0.25-0.34.
+- The generic threshold 0.21 gave F1 0.89 pooled (F1 0.81 on gA_1, whose open eyes are low: median 0.25, 5th percentile 0.19, so 315 false closures; 0.97-0.99 on the other two). Anywhere from 0.14 to 0.17 gives about 0.98. **`ear_threshold` is now 0.15** (`configs/vision.yaml`, evidence in the comment). Caveat: chosen on 3 subjects that may land in a test split later; re-check on DMD training drivers once enough exist. gA_1 is the case for per-driver calibration (P4).
+- The check is a regression test (`tests/integration/test_real_datasets.py`, F1 above 0.95), skipped where the cache is absent.
+
+**Combined UAH + DMD run (splits, `WindowDataset`, mixed batch, toy fusion forward):** works, and shows the limit: the 3 DMD sessions give about 170 windows per split (88% unlabelled, only `drowsy` labelled), so a batch of 64 windows held no camera window at all. **The vision side has far too little data to train**; the remaining drowsiness files, the Distraction set and own recordings are needed, and fusion training will need a modality-balanced sampler (P3).
+
 ### Next
 1. Download the DMD **Distraction** set (and, later, the remaining Drowsiness files) and check its labels.
 2. Run the loaders again after any change: `uv run python scripts/process_uah.py data/raw/uah_driveset --out data/processed/uah --keep-going --overwrite`.

@@ -117,3 +117,47 @@ def test_dmd_drowsiness_annotations_parse_with_no_unknown_label(session: str) ->
     assert sum(e["type"] == "micro_sleep" for e in res.events) == n_micro
     labelled = res.y_cls[res.y_cls != S.UNLABELED]
     assert set(labelled.tolist()) <= {S.CLASS_TO_ID["drowsy"]}  # these files carry no normal label
+
+
+DMD_CACHE = data_dir() / "interim" / "dmd"
+needs_dmd_cache = pytest.mark.skipif(
+    not (DMD_ROOT.is_dir() and DMD_CACHE.is_dir() and any(DMD_CACHE.glob("*.npz"))),
+    reason="no cached DMD landmarks (run scripts/process_dmd.py with the vision group)",
+)
+
+
+@needs_dmd_cache
+def test_dmd_eye_closure_detection_matches_the_human_annotation() -> None:
+    """Pooled over the 3 real sessions at the default EAR threshold (measured: F1 0.98 at 0.15)."""
+    from driverisk.data import dmd_trips as T
+    from driverisk.features import vision as V
+
+    cfg = V.load_vision_config()
+    truth_all, pred_all = [], []
+    for s in T.find_sessions(DMD_ROOT):
+        path = T.cache_path(DMD_CACHE, s.stem)
+        if not path.is_file():
+            continue
+        c = T.load_landmark_cache(path)
+        n = len(c.t)
+        closed = np.zeros(n, bool)
+        open_ = np.zeros(n, bool)
+        for iv in D.parse_openlabel(D.load_openlabel(s.annotation)).intervals:
+            span = slice(iv.frame_start, min(iv.frame_end + 1, n))
+            if iv.label == "eyes_state/close":
+                closed[span] = True
+            elif iv.label == "eyes_state/open":
+                open_[span] = True
+        aspect = c.size[1] / c.size[0]
+        for i in np.flatnonzero(closed | open_):
+            if np.isnan(c.landmarks[i, 0, 0]):
+                continue
+            mat = None if np.isnan(c.matrices[i]).any() else c.matrices[i]
+            ear = V.frame_features(c.landmarks[i], mat, cfg, None, aspect)["ear_mean"]
+            if np.isfinite(ear):
+                truth_all.append(bool(closed[i]))
+                pred_all.append(ear < cfg["ear_threshold"])
+    truth, pred = np.array(truth_all), np.array(pred_all)
+    assert len(truth) > 5000 and truth.mean() > 0.05
+    tp, fp, fn = (pred & truth).sum(), (pred & ~truth).sum(), (~pred & truth).sum()
+    assert 2 * tp / (2 * tp + fp + fn) > 0.95
